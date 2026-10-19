@@ -1,0 +1,34 @@
+[
+  {
+    "query": "Put a visible cursor overlay on my Chrome tab that logs everything I click and type while I reproduce this checkout bug",
+    "should_trigger": true
+  },
+  {
+    "query": "I want to record every interaction on the page, mine and yours, so I can see the exact click sequence before the modal breaks",
+    "should_trigger": true
+  },
+  {
+    "query": "Install the all-actions tracker on the localhost:3000 tab I have open",
+    "should_trigger": true
+  },
+  {
+    "query": "Show a log panel of all hover, click and key events happening in my browser tab while I test the signup form",
+    "should_trigger": true
+  },
+  {
+    "query": "Inspect the dashboard tab in Chrome and tell me why the sidebar overlaps the header",
+    "should_trigger": false
+  },
+  {
+    "query": "Add analytics event tracking for button clicks to our React app",
+    "should_trigger": false
+  },
+  {
+    "query": "Write a Playwright test that clicks through the signup flow",
+    "should_trigger": false
+  },
+  {
+    "query": "Review my diff that adds a click handler to the navbar",
+    "should_trigger": false
+  }
+]

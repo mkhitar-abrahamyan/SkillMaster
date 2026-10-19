@@ -1,0 +1,42 @@
+[
+  {
+    "query": "I'm about to switch to a new chat. Write up where we are so I can paste it in.",
+    "should_trigger": true
+  },
+  {
+    "query": "Context is getting long. Summarize our progress, decisions, and next steps for whoever picks this up.",
+    "should_trigger": true
+  },
+  {
+    "query": "Write a handoff note for Sam, who's continuing this migration tomorrow",
+    "should_trigger": true
+  },
+  {
+    "query": "Before we stop for today, give me a status recap with the failing tests and what's left",
+    "should_trigger": true
+  },
+  {
+    "query": "I'm moving this task from Claude to Codex. Produce a handoff they can work from.",
+    "should_trigger": true
+  },
+  {
+    "query": "Summarize this article about Kubernetes operators",
+    "should_trigger": false
+  },
+  {
+    "query": "Write the PR description for these changes",
+    "should_trigger": false
+  },
+  {
+    "query": "Explain the architecture of this repo for a new teammate",
+    "should_trigger": false
+  },
+  {
+    "query": "Write release notes for v2.3",
+    "should_trigger": false
+  },
+  {
+    "query": "What did the last commit change?",
+    "should_trigger": false
+  }
+]

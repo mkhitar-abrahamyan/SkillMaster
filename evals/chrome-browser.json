@@ -1,0 +1,34 @@
+[
+  {
+    "query": "Open my Chrome tab on the admin page and check why the Save button is disabled",
+    "should_trigger": true
+  },
+  {
+    "query": "In the browser, search the customer list for 'Smith', confirm the filter works, then clear it",
+    "should_trigger": true
+  },
+  {
+    "query": "Look at the console errors on the checkout page I have open in Chrome",
+    "should_trigger": true
+  },
+  {
+    "query": "Check whether the icon inside the toolbar button is centered on the staging page",
+    "should_trigger": true
+  },
+  {
+    "query": "Install an overlay that logs every click and keystroke I make on the page",
+    "should_trigger": false
+  },
+  {
+    "query": "Why does this React component re-render twice? Here's the code.",
+    "should_trigger": false
+  },
+  {
+    "query": "Write Cypress tests for the login page",
+    "should_trigger": false
+  },
+  {
+    "query": "Our GitHub Actions e2e job fails with a browser launch timeout",
+    "should_trigger": false
+  }
+]

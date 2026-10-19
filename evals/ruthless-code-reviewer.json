@@ -1,0 +1,34 @@
+[
+  {
+    "query": "Review my uncommitted changes before I commit them",
+    "should_trigger": true
+  },
+  {
+    "query": "Do a thorough code review of PR #87 against main, focusing on regressions and security",
+    "should_trigger": true
+  },
+  {
+    "query": "Review commit a1b2c3d, it touches the session refresh logic",
+    "should_trigger": true
+  },
+  {
+    "query": "Review this patch for bugs: '- if (user.role === \"admin\")' changed to '+ if (user.role = \"admin\")'",
+    "should_trigger": true
+  },
+  {
+    "query": "Try to break my caching patch with concurrent requests and show me a failing test",
+    "should_trigger": false
+  },
+  {
+    "query": "Refactor the user service into smaller classes without changing behavior",
+    "should_trigger": false
+  },
+  {
+    "query": "What tests should I add for the new invoice export?",
+    "should_trigger": false
+  },
+  {
+    "query": "Explain how our review process works in CONTRIBUTING.md",
+    "should_trigger": false
+  }
+]

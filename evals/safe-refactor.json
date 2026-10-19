@@ -1,0 +1,42 @@
+[
+  {
+    "query": "Refactor this 900-line OrderController into smaller services without changing behavior",
+    "should_trigger": true
+  },
+  {
+    "query": "Rename the usr fields to user across the codebase, but nothing may break for API consumers",
+    "should_trigger": true
+  },
+  {
+    "query": "Clean up the legacy billing code. It has no tests and I'm scared to touch it.",
+    "should_trigger": true
+  },
+  {
+    "query": "Extract the duplicated validation logic in these three handlers into a shared helper",
+    "should_trigger": true
+  },
+  {
+    "query": "Convert this callback-based module to async/await while keeping it behaviorally identical",
+    "should_trigger": true
+  },
+  {
+    "query": "Add a nickname field to the user profile",
+    "should_trigger": false
+  },
+  {
+    "query": "Review my refactoring PR",
+    "should_trigger": false
+  },
+  {
+    "query": "Fix the bug where the refactored parser drops whitespace",
+    "should_trigger": false
+  },
+  {
+    "query": "Plan a migration from REST to GraphQL",
+    "should_trigger": false
+  },
+  {
+    "query": "Format all files with prettier",
+    "should_trigger": false
+  }
+]

@@ -1,0 +1,42 @@
+[
+  {
+    "query": "Users say the date picker shows yesterday's date for anyone in UTC-5. Reproduce it and fix it.",
+    "should_trigger": true
+  },
+  {
+    "query": "This used to work last week: yarn build now produces a bundle where the env vars are undefined. Find out why.",
+    "should_trigger": true
+  },
+  {
+    "query": "Getting TypeError: Cannot read properties of undefined (reading 'id') in OrderService.cancel when the order has no items. Stack trace below, please fix.",
+    "should_trigger": true
+  },
+  {
+    "query": "Issue #341: CSV import drops the last row when the file has no trailing newline. Investigate and tell me the root cause, don't fix it yet.",
+    "should_trigger": true
+  },
+  {
+    "query": "The app crashes on Android when the screen rotates during an upload. Figure out what's going on.",
+    "should_trigger": true
+  },
+  {
+    "query": "Try to break my new retry logic with adversarial tests",
+    "should_trigger": false
+  },
+  {
+    "query": "Our GitHub Actions run 8812345 is red on the lint job, what happened?",
+    "should_trigger": false
+  },
+  {
+    "query": "Plan the work for adding dark mode",
+    "should_trigger": false
+  },
+  {
+    "query": "Review my staged changes",
+    "should_trigger": false
+  },
+  {
+    "query": "Refactor the upload module into smaller functions",
+    "should_trigger": false
+  }
+]

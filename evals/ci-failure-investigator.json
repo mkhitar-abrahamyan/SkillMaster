@@ -1,0 +1,42 @@
+[
+  {
+    "query": "Why is my GitHub Actions run failing? https://github.com/acme/api/actions/runs/123456789",
+    "should_trigger": true
+  },
+  {
+    "query": "PR #77's checks are red on the 'test (node 20)' job but everything passes locally",
+    "should_trigger": true
+  },
+  {
+    "query": "Our main branch CI broke overnight and nobody pushed anything",
+    "should_trigger": true
+  },
+  {
+    "query": "The e2e workflow times out about one run in five. Is it flaky or a real problem?",
+    "should_trigger": true
+  },
+  {
+    "query": "Here's the failed build log from CI: 'npm ERR! code ERESOLVE ... Process completed with exit code 1'. What's the actual cause?",
+    "should_trigger": true
+  },
+  {
+    "query": "Set up a GitHub Actions workflow that runs our tests on every PR",
+    "should_trigger": false
+  },
+  {
+    "query": "Users report a crash in production after yesterday's deploy",
+    "should_trigger": false
+  },
+  {
+    "query": "Review the changes to .github/workflows/release.yml on my branch",
+    "should_trigger": false
+  },
+  {
+    "query": "Make our test suite run faster",
+    "should_trigger": false
+  },
+  {
+    "query": "Explain what this GitHub Actions matrix configuration does",
+    "should_trigger": false
+  }
+]

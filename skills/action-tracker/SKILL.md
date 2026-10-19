@@ -1,6 +1,8 @@
 ---
 name: action-tracker
 description: Install a visible overlay in a Chrome tab that logs ALL pointer and keyboard actions (user and agent) with a cursor, click ripples, hover/focus boxes and an action log. Use when the user wants to watch or record every interaction on a page; for agent-only tracking use chrome-browser.
+license: MIT
+compatibility: Requires the Chrome DevTools MCP server (chrome-devtools) connected to a running Chrome with remote debugging enabled.
 ---
 
 # All-actions tracker
@@ -11,7 +13,7 @@ Logs every hover, click, focus, key and input on the page, whether performed by 
 
 1. Read `scripts/action-tracker-all.js` (next to this file) (one arrow function).
 2. Call `evaluate_script` with its body unchanged as `function` and `waitForStableDom: false`. It is idempotent and returns `action-tracker installed` or `action-tracker already installed`.
-3. Do not run it together with `scripts/action-tracker-agent.js` on the same page: both use `window.__actionTracker`; call `window.__actionTracker.off()` and reload (or ensure only one is installed) before switching.
+3. Do not run it together with the agent-only tracker from the `chrome-browser` skill on the same page: both use `window.__actionTracker`; call `window.__actionTracker.off()` and reload (or ensure only one is installed) before switching.
 
 ## Behavior
 

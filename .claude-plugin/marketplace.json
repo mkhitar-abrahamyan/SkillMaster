@@ -1,0 +1,14 @@
+{
+  "name": "skillmaster",
+  "description": "SkillMaster agent skills for reliable AI coding.",
+  "owner": {
+    "name": "Mkhitar Abrahamyan"
+  },
+  "plugins": [
+    {
+      "name": "skillmaster",
+      "source": "./",
+      "description": "Agent skills for reliable AI coding, from repository context to a verified, reviewed change."
+    }
+  ]
+}

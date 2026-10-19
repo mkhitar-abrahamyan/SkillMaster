@@ -1,6 +1,8 @@
 ---
 name: chrome-browser
 description: Use existing Chrome tabs to inspect web interfaces, investigate UI bugs, and perform browser interactions requested by the user through Chrome DevTools MCP. Apply to browser work, not source-only analysis.
+license: MIT
+compatibility: Requires the Chrome DevTools MCP server (chrome-devtools) connected to a running Chrome with remote debugging enabled.
 ---
 
 # Chrome workflow
@@ -39,7 +41,7 @@ Chrome DevTools MCP interactions are CDP-driven, so the user sees no cursor. Bef
 - The overlay lives in a closed shadow root with `pointer-events: none`, so it does not intercept clicks or touch page styles. It is lost on reload or full navigation; reinstall afterwards. In-app route changes keep it.
 - When debugging is finished (before the final answer), always remove the overlay: `evaluate_script` (`waitForStableDom: false`) with `() => { if (window.__actionTracker) { window.__actionTracker.off(); delete window.__actionTracker; } return !document.getElementById('__action-tracker-host'); }`. Leave no overlay on the user's page, and confirm `typeof window.__actionTracker` no longer shows an overlay if unsure.
 - It only displays what the agent reports; it does not click anything. The panel can cover the bottom-right corner; take element screenshots or run `.off()` when verifying layout there.
-- To log every event (user and agent) instead, use `../action-tracker/scripts/action-tracker-all.js` the same way; see the `action-tracker` skill.
+- To log every event (user and agent) instead, use the `action-tracker` skill.
 
 ### Recipe: check list search
 

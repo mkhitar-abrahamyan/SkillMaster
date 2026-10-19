@@ -1,0 +1,42 @@
+[
+  {
+    "query": "We need to let users export invoices as CSV. Before writing any code, plan it: requirements, acceptance criteria, files to touch, tests.",
+    "should_trigger": true
+  },
+  {
+    "query": "Break down 'add SSO with Okta' into implementation steps for our NestJS backend",
+    "should_trigger": true
+  },
+  {
+    "query": "Spec out a notification preferences page so a junior developer could implement it",
+    "should_trigger": true
+  },
+  {
+    "query": "Product asked for 'better search'. Scope what that means for our codebase and what we would build.",
+    "should_trigger": true
+  },
+  {
+    "query": "Write an implementation plan for adding soft delete to the projects table, including migration risks",
+    "should_trigger": true
+  },
+  {
+    "query": "Implement the CSV export now; the plan is already approved in docs/plans/csv-export.md",
+    "should_trigger": false
+  },
+  {
+    "query": "Give me an overview of how this repo is structured",
+    "should_trigger": false
+  },
+  {
+    "query": "The search endpoint returns 500 when the query contains an apostrophe, fix it",
+    "should_trigger": false
+  },
+  {
+    "query": "Review PR #45, which adds SSO",
+    "should_trigger": false
+  },
+  {
+    "query": "Write handoff notes for the invoice work we did today",
+    "should_trigger": false
+  }
+]

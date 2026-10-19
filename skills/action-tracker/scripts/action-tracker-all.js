@@ -1,8 +1,5 @@
 () => {
-  // Chrome action tracker (AGENT-ONLY): shows only actions the agent performs; user input is ignored.
-  // CDP input events are indistinguishable from user input, so this version attaches NO page listeners.
-  // The agent reports each action itself: window.__actionTracker.act('click'|'hover'|'focus'|'input'|'key', selector|text, detail).
-  // User actions are therefore never logged.
+  // Chrome action tracker (ALL ACTIONS): logs every user AND agent hover, click, focus, key and input.
   // Paste as the `function` of evaluate_script (also usable as navigate_page `initScript`
   // body if wrapped as `(<this function>)()`). Idempotent; remove with window.__actionTracker.off().
   if (window.__actionTracker) {
@@ -47,7 +44,7 @@
     <div class="cursor" id="cursor">
       <svg width="22" height="22" viewBox="0 0 24 24"><path d="M3 2l7 19 3-8 8-3z" fill="#fff" stroke="#000" stroke-width="1.5" stroke-linejoin="round"/></svg>
     </div>
-    <div class="panel" id="panel"><h4>Agent actions</h4><div id="log"></div></div>`;
+    <div class="panel" id="panel"><h4>All actions</h4><div id="log"></div></div>`;
   const $ = (id) => root.getElementById(id);
   const cursor = $('cursor'), target = $('target'), tag = $('tag'), log = $('log');
   const lines = [];
@@ -62,7 +59,16 @@
       .replace(/\s+/g, ' ').trim().slice(0, 40);
     return `${t}${id}${name}${label ? ' "' + label + '"' : ''}`;
   };
-  const secret = (el) => el && el.tagName === 'INPUT' && /password/i.test(el.type || '');
+  // Returns true when the element's value must never appear in the overlay. It drives masking of
+  // both INPUT values and per-character KEY lines, and the overlay is visible in screenshots.
+  const secret = (el) => {
+    if (!el || !el.tagName) return false;
+    // TODO(privacy policy): decide which fields are sensitive by default. Available signals:
+    //   el.type (password, email, tel, number, hidden), el.autocomplete (cc-number, cc-csc,
+    //   one-time-code, current-password, new-password, email, tel, street-address, bday),
+    //   el.name / el.id (token, secret, ssn, iban, pin), el.isContentEditable, el.tagName (TEXTAREA, SELECT).
+    return el.tagName === 'INPUT' && /password/i.test(el.type || '');
+  };
   const clock = () => new Date().toLocaleTimeString('en-GB');
 
   const add = (kind, text) => {
@@ -99,30 +105,57 @@
     setTimeout(() => d.remove(), 800);
   };
 
-  const act = (kind, sel, detail) => {
-    if (kind === 'key') { add('key', String(sel)); return 'ok'; }
-    const el = typeof sel === 'string' ? document.querySelector(sel) : sel;
-    if (!el) { add('nav', 'not found: ' + sel); return 'not found'; }
-    const r = el.getBoundingClientRect();
-    const x = r.left + r.width / 2, y = r.top + r.height / 2;
-    move(x, y);
-    if (kind === 'click') { ripple(x, y); box(el, 'click', 'CLICK ' + describe(el)); add('click', `${describe(el)} @ ${Math.round(x)},${Math.round(y)}`); }
-    else if (kind === 'hover') { box(el, 'hover', 'hover ' + describe(el)); add('hover', describe(el)); }
-    else if (kind === 'focus') { box(el, 'focus', 'focus ' + describe(el)); add('focus', describe(el)); }
-    else if (kind === 'input') {
-      const v = secret(el) ? '\u2022\u2022\u2022' : String(detail ?? '').slice(0, 40);
-      box(el, 'focus', 'input ' + describe(el)); add('input', `${describe(el)} = "${v}"`);
-    }
-    return 'ok';
+  let lastHover;
+  const handlers = {
+    mousemove: (e) => {
+      move(e.clientX, e.clientY);
+      const el = e.target;
+      if (el !== lastHover) {
+        lastHover = el;
+        box(el, 'hover', 'hover ' + describe(el));
+        add('hover', describe(el));
+      }
+    },
+    mousedown: (e) => {
+      move(e.clientX, e.clientY);
+      ripple(e.clientX, e.clientY);
+      box(e.target, 'click', 'CLICK ' + describe(e.target));
+      add('click', `${describe(e.target)} @ ${Math.round(e.clientX)},${Math.round(e.clientY)}` +
+        (e.detail > 1 ? ` x${e.detail}` : ''));
+    },
+    focusin: (e) => {
+      box(e.target, 'focus', 'focus ' + describe(e.target));
+      add('focus', describe(e.target));
+    },
+    keydown: (e) => {
+      const mods = ['Control', 'Alt', 'Shift', 'Meta'].filter((m) => e[m.toLowerCase() + 'Key'] && e.key !== m);
+      const key = secret(document.activeElement) && e.key.length === 1 ? '\u2022' : e.key;
+      add('key', [...mods, key].join('+'));
+    },
+    input: (e) => {
+      const el = e.target;
+      const v = secret(el) ? '\u2022'.repeat(String(el.value || '').length) : String(el.value ?? '').slice(0, 40);
+      box(el, 'focus', 'input ' + describe(el));
+      add('input', `${describe(el)} = "${v}"`);
+    },
+    change: (e) => add('input', `change ${describe(e.target)}`),
+    scroll: () => {},
   };
-  const on = () => { document.documentElement.appendChild(host); };
-  const off = () => { host.remove(); };
+  const opts = { capture: true, passive: true };
+  const on = () => {
+    document.documentElement.appendChild(host);
+    Object.entries(handlers).forEach(([k, f]) => document.addEventListener(k, f, opts));
+  };
+  const off = () => {
+    Object.entries(handlers).forEach(([k, f]) => document.removeEventListener(k, f, opts));
+    host.remove();
+  };
   window.__actionTracker = {
-    on, off, act,
+    on, off,
     note: (text) => add('nav', String(text).slice(0, 120)), // label the step the agent is about to do
     clear: () => { lines.length = 0; log.innerHTML = ''; },
   };
   on();
-  add('nav', 'agent tracker on: ' + location.pathname);
+  add('nav', 'tracker on: ' + location.pathname);
   return 'action-tracker installed';
 }

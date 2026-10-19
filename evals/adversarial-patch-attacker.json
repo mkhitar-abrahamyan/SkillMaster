@@ -1,0 +1,34 @@
+[
+  {
+    "query": "Try to break my rate-limiter patch on this branch: write tests that hammer it concurrently and see if the limit can be bypassed",
+    "should_trigger": true
+  },
+  {
+    "query": "Stress-test the idempotency change in the last commit. I want a failing reproduction if retries can double-charge a card",
+    "should_trigger": true
+  },
+  {
+    "query": "Fuzz the new date parser in src/utils/parseDate.ts from my uncommitted changes and see what crashes it",
+    "should_trigger": true
+  },
+  {
+    "query": "Attack PR #212's authorization changes as a user from another tenant and tell me if anything leaks",
+    "should_trigger": true
+  },
+  {
+    "query": "Review the diff on my feature branch before I open a PR",
+    "should_trigger": false
+  },
+  {
+    "query": "Users report that orders are sometimes duplicated in production, find out why",
+    "should_trigger": false
+  },
+  {
+    "query": "Which tests are missing for the payment retry logic I just changed?",
+    "should_trigger": false
+  },
+  {
+    "query": "Explain how the auth middleware in this repo works",
+    "should_trigger": false
+  }
+]

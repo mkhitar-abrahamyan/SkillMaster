@@ -1,0 +1,42 @@
+[
+  {
+    "query": "Is my change to the discount calculation adequately tested? List the branches without tests.",
+    "should_trigger": true
+  },
+  {
+    "query": "Coverage says 92% on the auth module but I don't trust the tests. Which behaviors aren't really asserted?",
+    "should_trigger": true
+  },
+  {
+    "query": "Add missing unit tests for the error paths in the webhook handler I changed on this branch",
+    "should_trigger": true
+  },
+  {
+    "query": "Before I merge, what test cases are missing for the new rate limiter?",
+    "should_trigger": true
+  },
+  {
+    "query": "Find untested edge cases in src/billing/proration.ts from my last commit and write tests for them",
+    "should_trigger": true
+  },
+  {
+    "query": "Our CI integration tests are flaky, why?",
+    "should_trigger": false
+  },
+  {
+    "query": "Try to break my rate limiter with concurrent requests",
+    "should_trigger": false
+  },
+  {
+    "query": "Set up Jest in this new project",
+    "should_trigger": false
+  },
+  {
+    "query": "Review my PR for bugs",
+    "should_trigger": false
+  },
+  {
+    "query": "Reproduce the bug where discounts are applied twice",
+    "should_trigger": false
+  }
+]

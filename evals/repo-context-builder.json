@@ -1,0 +1,42 @@
+[
+  {
+    "query": "I just cloned this repo and have no idea how it's organized. Give me an overview of the architecture and how to run the tests.",
+    "should_trigger": true
+  },
+  {
+    "query": "Draft an AGENTS.md for this project so agents stop asking me which package manager and test command to use",
+    "should_trigger": true
+  },
+  {
+    "query": "What's the build, test and lint setup in this monorepo, and where do the services live?",
+    "should_trigger": true
+  },
+  {
+    "query": "Our CLAUDE.md is outdated. Refresh it based on what the code actually does now.",
+    "should_trigger": true
+  },
+  {
+    "query": "Onboard yourself to this codebase before we start: conventions, entry points, and danger zones",
+    "should_trigger": true
+  },
+  {
+    "query": "Plan how we should add multi-currency support to the billing module",
+    "should_trigger": false
+  },
+  {
+    "query": "Write user-facing API documentation for the /v2/orders endpoint",
+    "should_trigger": false
+  },
+  {
+    "query": "Summarize what I did this session so I can continue tomorrow in a new chat",
+    "should_trigger": false
+  },
+  {
+    "query": "Why does npm test fail with 'Cannot find module ./config'?",
+    "should_trigger": false
+  },
+  {
+    "query": "Explain what this regex does: ^[a-z0-9]+(-[a-z0-9]+)*$",
+    "should_trigger": false
+  }
+]

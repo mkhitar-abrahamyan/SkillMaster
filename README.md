@@ -1,0 +1,195 @@
+# SkillMaster
+
+Agent skills that make AI coding reliable from the first prompt to the final tested change.
+
+Each skill is a folder with a `SKILL.md` in the open [Agent Skills](https://agentskills.io/specification)
+format, so it works in Claude Code, Codex, GitHub Copilot, and other agents that read that format.
+Every skill ends with an explicit result such as `FIXED`, `GAPS FOUND`, or `BLOCK`, and separates
+checks that actually ran from assumptions that were never verified.
+
+## Skills
+
+| Stage | Skill | Use it when | Ends with |
+|-------|-------|-------------|-----------|
+| Understand | [repo-context-builder](skills/repo-context-builder/SKILL.md) | You open an unfamiliar repo, or want a draft `AGENTS.md` | A context document; every command labeled `verified`, `documented`, or `inferred` |
+| Plan | [feature-planner](skills/feature-planner/SKILL.md) | A request needs requirements, acceptance criteria, and steps before coding | `READY`, `READY WITH ASSUMPTIONS`, `BLOCKED` |
+| Diagnose | [bug-reproducer](skills/bug-reproducer/SKILL.md) | A bug report, crash, or regression needs reproducing, diagnosing, or fixing | `FIXED`, `REPRODUCED`, `NOT REPRODUCED`, `INCONCLUSIVE` |
+| Diagnose | [ci-failure-investigator](skills/ci-failure-investigator/SKILL.md) | A GitHub Actions run or PR check is red or flaky | `CODE DEFECT`, `TEST DEFECT`, `FLAKY`, `ENVIRONMENT`, `CONFIGURATION`, `INCONCLUSIVE` |
+| Change | [safe-refactor](skills/safe-refactor/SKILL.md) | Code must be restructured without changing behavior | `BEHAVIOR PRESERVED`, `PRESERVED WITH GAPS`, `ABORTED` |
+| Verify | [ai-code-verifier](skills/ai-code-verifier/SKILL.md) | AI-written code or an AI's "tests pass" claim needs checking | `VERIFIED`, `ISSUES FOUND`, `FAILED`, `INCONCLUSIVE` |
+| Verify | [test-gap-finder](skills/test-gap-finder/SKILL.md) | You need to know which behaviors are untested, and want tests proven to fail on breakage | `ADEQUATE`, `GAPS CLOSED`, `GAPS FOUND`, `DEFECT FOUND`, `INCONCLUSIVE` |
+| Review | [ruthless-code-reviewer](skills/ruthless-code-reviewer/SKILL.md) | A diff, commit, or PR needs a defect-first review | `APPROVE` … `BLOCK`, `INCONCLUSIVE` |
+| Review | [adversarial-patch-attacker](skills/adversarial-patch-attacker/SKILL.md) | You explicitly want a patch attacked with reproduction tests | `SURVIVED`, `BROKEN`, `SUSPICIOUS`, `NO REACHABLE SURFACE`, `INCONCLUSIVE` |
+| Hand off | [session-handoff](skills/session-handoff/SKILL.md) | You switch chats, models, tools, or people mid-task | A 40–80 line handoff note built from git and real check results |
+| All stages | [skillmaster-workflow](skills/skillmaster-workflow/SKILL.md) | You want a change taken end to end: understand, plan, implement, verify, review | `VERIFIED`, `PARTIALLY VERIFIED`, `ISSUES REMAIN`, `BLOCKED` |
+| Browser | [chrome-browser](skills/chrome-browser/SKILL.md) | You need to inspect or interact with a page in your running Chrome | Observations and the actions completed |
+| Browser | [action-tracker](skills/action-tracker/SKILL.md) | You want a visible overlay that logs every click and keystroke on a page | Overlay installed; removed when the work is done |
+
+## The workflow
+
+`skillmaster-workflow` chains the skills, with a gate between each stage:
+
+```mermaid
+flowchart LR
+  A[Understand<br/>repo-context-builder] --> B[Plan<br/>feature-planner]
+  B --> C[Implement]
+  C --> D[Verify<br/>ai-code-verifier<br/>test-gap-finder]
+  D --> E[Review and attack<br/>ruthless-code-reviewer<br/>adversarial-patch-attacker]
+  E --> F[Hand off<br/>verified report]
+  D -- findings --> C
+  E -- findings --> C
+```
+
+Bugs start at `bug-reproducer`, CI failures at `ci-failure-investigator`, and refactors at
+`safe-refactor`. The final report lists the checks that ran on the final code, the assumptions that
+remain unverified, and the residual risks. See [examples/](examples/) for complete walkthroughs.
+
+## Install
+
+Install the whole folder for each skill: skills carry their own `references/` and `scripts/`.
+`skillmaster-workflow` hands each stage to the matching skill, so install every skill for the best
+results.
+
+### Claude Code
+
+Install all skills as a plugin:
+
+```text
+/plugin marketplace add mkhitar-abrahamyan/SkillMaster
+/plugin install skillmaster@skillmaster
+```
+
+Plugin skills are namespaced, for example `skillmaster:bug-reproducer`. To install single skills
+instead, use the GitHub CLI or copy folders into `~/.claude/skills/` (personal) or
+`.claude/skills/` (project).
+
+### GitHub CLI (Claude Code, Codex, Copilot, Cursor, Gemini CLI, and more)
+
+[`gh skill`](https://cli.github.com/manual/gh_skill_install) requires GitHub CLI 2.90.0 or later
+and is in public preview.
+
+```bash
+# Pick skills interactively
+gh skill install mkhitar-abrahamyan/SkillMaster
+
+# One skill, for one agent, for every project
+gh skill install mkhitar-abrahamyan/SkillMaster bug-reproducer --agent claude-code --scope user
+
+# Every skill into the current project for Codex (Copilot: --agent github-copilot)
+gh skill install mkhitar-abrahamyan/SkillMaster --all --agent codex
+```
+
+`gh skill` installs the latest tagged release, falling back to the default branch. Pin a version
+with `skill@<tag>` or `--pin <tag>`. GitHub does not verify skills; read a skill before you install
+it, this one included.
+
+### Manual copy
+
+| Agent | Project skills | Personal skills |
+|-------|----------------|-----------------|
+| Claude Code | `.claude/skills/` | `~/.claude/skills/` |
+| Codex | `.agents/skills/` (scanned from the working directory up to the repo root) | `~/.agents/skills/` |
+| GitHub Copilot | `.github/skills/`, `.claude/skills/`, or `.agents/skills/` | `~/.copilot/skills/` |
+
+```bash
+git clone https://github.com/mkhitar-abrahamyan/SkillMaster.git
+mkdir -p ~/.claude/skills
+cp -r SkillMaster/skills/bug-reproducer ~/.claude/skills/
+```
+
+```powershell
+git clone https://github.com/mkhitar-abrahamyan/SkillMaster.git
+New-Item -ItemType Directory -Force "$HOME\.claude\skills" | Out-Null
+Copy-Item -Recurse SkillMaster\skills\bug-reproducer "$HOME\.claude\skills\"
+```
+
+## Prerequisites
+
+| Skills | Needs |
+|--------|-------|
+| All | `git`, and the project's own toolchain for running its tests |
+| `ci-failure-investigator` | GitHub CLI (`gh`) authenticated for the repository, or a pasted log |
+| `chrome-browser`, `action-tracker` | The [Chrome DevTools MCP server](https://github.com/ChromeDevTools/chrome-devtools-mcp) configured as `chrome-devtools`, and Chrome with remote debugging enabled |
+| Contributing | Python 3.9+ with PyYAML, and Node.js |
+
+## Example prompts
+
+| Prompt | What you get |
+|--------|--------------|
+| "I just cloned this repo. How is it organized and how do I run one test?" | A context document with traced entry points and provenance-labeled commands |
+| "Plan CSV export for invoices before writing any code." | Acceptance criteria, impacted files, steps with `verify:` lines, and `Plan readiness: READY…` |
+| "Dates show as yesterday for users in UTC-5. Reproduce and fix it." | A failing test, the root cause at `file:line`, the fix, red-to-green evidence, `Bug status: FIXED` |
+| "Why is this run red? https://github.com/org/repo/actions/runs/123" | The first meaningful failure, a comparison with the last green run, and a classification |
+| "Cursor wrote this module and says the tests pass. Verify it." | A claims table (`verified` / `contradicted` / `unverified`) and checks for invented packages and APIs |
+| "Is my discount change adequately tested? Add what's missing." | A behavior map, plus new tests each proven to fail when its behavior breaks |
+| "Split this 900-line controller without changing behavior." | Baseline and after-refactor comparison, step-by-step check results |
+| "Review my uncommitted changes." | P0–P3 findings with confidence labels and a verdict |
+| "Try to break my rate limiter with concurrent requests." | Executed attack tests and `Attack result: BROKEN`, `SURVIVED`, … |
+| "I'm switching to a new chat. Write a handoff." | A handoff note with fresh/stale check status and an immediately executable next step |
+| "Use SkillMaster to add Google sign-in to my NestJS API, test it, and review it for security problems." | All stages run, ending in a `Delivery result:` report |
+
+## Safety and privacy
+
+- Review and verification skills leave the reviewed source unchanged. Generated tests, mutation
+  checks, and reproduction scripts go to scratch space or an isolated copy unless you ask for them
+  to be added to the project.
+- No skill commits, pushes, re-runs CI, deploys, runs migrations against shared databases, or
+  changes secrets without your explicit approval.
+- No skill reads `.env` files, secrets, credentials, or dumps; configuration shape comes from
+  example files.
+- Browser skills act in your real Chrome session through the DevTools protocol, so the agent can see
+  what the page shows and act as you. They stay within the requested scope, do not read cookies or
+  stored credentials, and remove their overlays when done. Enable remote debugging only while you
+  need it, ideally in a profile without unrelated signed-in sessions.
+- Typed values that the action-tracker overlay considers sensitive are masked in both its input and
+  keystroke lines, because the overlay appears in screenshots. The policy is the `secret()` function
+  in [action-tracker-all.js](skills/action-tracker/scripts/action-tracker-all.js).
+
+## Repository layout
+
+```text
+skills/<name>/SKILL.md      one folder per skill; name matches the folder
+skills/<name>/references/   reference files the skill links to (copies of shared files are synced)
+skills/<name>/scripts/      scripts the skill runs
+references/                 canonical shared review references
+evals/<name>.json           trigger evals: prompts that should and should not activate each skill
+examples/                   end-to-end walkthroughs
+tools/validate_skills.py    the CI validator
+.claude-plugin/             Claude Code plugin and marketplace manifests
+```
+
+## Contributing
+
+1. Keep every file a skill needs inside its folder; installs copy only that folder. Edit shared
+   references in `references/`, then run `python tools/validate_skills.py --fix` to sync the copies.
+2. Add `evals/<skill>.json` with at least three prompts that should trigger the skill and three
+   near-misses that should not.
+3. Run `python tools/validate_skills.py`. CI runs the same check on every push and pull request:
+   frontmatter against the spec, links and bundled paths, shared-reference drift, JavaScript syntax,
+   eval coverage, and plugin manifests.
+
+To measure how reliably a description triggers, run the eval set with the
+[skill-creator](https://github.com/anthropics/skills) plugin's `run_eval.py`, from that skill's
+directory. It calls `claude -p` several times per prompt and uses your Claude usage.
+
+```bash
+python -m scripts.run_eval --eval-set /path/to/SkillMaster/evals/bug-reproducer.json \
+  --skill-path /path/to/SkillMaster/skills/bug-reproducer
+```
+
+## Roadmap
+
+| Release | Scope | Status |
+|---------|-------|--------|
+| v0.1 | Standard packaging, README, LICENSE, install guide, CI validation | Done |
+| v0.2 | repo-context-builder, feature-planner, bug-reproducer | Done |
+| v0.3 | ai-code-verifier, test-gap-finder, safe-refactor, ci-failure-investigator, session-handoff | Done |
+| v0.4 | skillmaster-workflow and end-to-end examples | Done |
+| v1.0 | One-command install (Claude Code plugin and `gh skill`), trigger-eval runs, behavioral evaluations, tested compatibility across assistants | Install done; eval runs and cross-assistant testing open |
+
+Planned specialized skills: React and Next.js performance, accessibility, NestJS API contracts, and
+database migration safety.
+
+## License
+
+[MIT](LICENSE)

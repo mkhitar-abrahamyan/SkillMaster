@@ -1,6 +1,7 @@
 ---
 name: ruthless-code-reviewer
 description: Perform a read-only, defect-first review of a specified code change and report only actionable findings introduced by that change. Use for diffs, commits, uncommitted changes, or pasted review targets when a rigorous regression, security, or maintainability review is requested.
+license: MIT
 ---
 
 # Skill: Ruthless Code Reviewer

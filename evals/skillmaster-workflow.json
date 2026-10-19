@@ -1,0 +1,42 @@
+[
+  {
+    "query": "Use SkillMaster to implement Google authentication in my NestJS project. Understand the architecture, create a plan, implement the feature, test it, and review it for security problems.",
+    "should_trigger": true
+  },
+  {
+    "query": "Take this bug from report to verified fix end to end with SkillMaster: password reset emails go to the wrong user",
+    "should_trigger": true
+  },
+  {
+    "query": "Run the full SkillMaster workflow to add CSV export: plan it, build it, test it, review it, and give me a verified handoff",
+    "should_trigger": true
+  },
+  {
+    "query": "Understand the repo, plan, implement, add tests for, and security-review a rate limiter for the public API. The whole pipeline.",
+    "should_trigger": true
+  },
+  {
+    "query": "Use SkillMaster on our failing CI: diagnose it, fix it, verify the fix, and review it",
+    "should_trigger": true
+  },
+  {
+    "query": "Just review my diff",
+    "should_trigger": false
+  },
+  {
+    "query": "Plan the Google auth feature but don't implement anything yet",
+    "should_trigger": false
+  },
+  {
+    "query": "Which skills does SkillMaster include?",
+    "should_trigger": false
+  },
+  {
+    "query": "Write a handoff for today's work",
+    "should_trigger": false
+  },
+  {
+    "query": "Rename this variable in utils.ts",
+    "should_trigger": false
+  }
+]
