@@ -211,7 +211,7 @@ python -m scripts.run_eval --eval-set /path/to/SkillMaster/evals/bug-reproducer.
 | v0.2 | repo-context-builder, feature-planner, bug-reproducer | Done |
 | v0.3 | ai-code-verifier, test-gap-finder, safe-refactor, ci-failure-investigator, session-handoff | Done |
 | v0.4 | skillmaster-workflow and end-to-end examples | Done |
-| v0.5 | Tracker masking proven in Chrome, tracker recordings as Playwright tests, a shared mutation runner, sharper skills, ci-parity-check, release-captain, figma-implementer | Ready, not released |
+| v0.5 | Tracker masking proven in Chrome, tracker recordings as Playwright tests, a shared mutation runner, sharper skills, ci-parity-check, release-captain, figma-implementer | Done |
 | v1.0 | One-command install (Claude Code plugin and `gh skill`), trigger-eval runs, behavioral evaluations, tested compatibility across assistants | Install done; eval runs and cross-assistant testing open |
 
 Planned specialized skills: React and Next.js performance, accessibility, NestJS API contracts, and
