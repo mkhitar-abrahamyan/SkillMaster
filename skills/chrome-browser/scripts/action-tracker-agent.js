@@ -62,7 +62,35 @@
       .replace(/\s+/g, ' ').trim().slice(0, 40);
     return `${t}${id}${name}${label ? ' "' + label + '"' : ''}`;
   };
-  const secret = (el) => el && el.tagName === 'INPUT' && /password/i.test(el.type || '');
+  // shared-block: sensitive-field start
+  // Whether an element's value must never appear in the overlay, which shows in screenshots. It errs
+  // toward masking: credentials, payment fields, one-time codes, bank and government IDs, hidden
+  // inputs, and anything marked data-tracker-mask. A field seen once as a password stays masked
+  // after a "show password" toggle turns it into text. Ordinary text, email, and phone fields show.
+  const SENSITIVE_AUTOCOMPLETE = /(^|\s)(cc-|one-time-code|current-password|new-password)/i;
+  // Matched against whole words of a field's name, id, label, and placeholder: "newPassword" and
+  // "user_pin" are sensitive, "passenger", "footprint", and "pinned" are not.
+  const SENSITIVE_WORDS =
+    /\b(pw|pwd|pass|password|passwd|passcode|passphrase|secret|token|otp|pin|ssn|iban|cvv|cvc|api ?key|private ?key|security ?code|card ?(number|num|no)|cc ?(number|num))\b/;
+  const words = (text) =>
+    text
+      .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+      .replace(/[^a-zA-Z0-9]+/g, ' ')
+      .toLowerCase();
+  const wasPassword = new WeakSet();
+  const secret = (el) => {
+    if (!el || !el.getAttribute) return false;
+    const field = el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable;
+    if (!field) return false;
+    if (el.type === 'password') wasPassword.add(el);
+    if (wasPassword.has(el) || el.type === 'hidden' || el.hasAttribute('data-tracker-mask')) return true;
+    if (SENSITIVE_AUTOCOMPLETE.test(el.getAttribute('autocomplete') || '')) return true;
+    const names = [el.getAttribute('name'), el.id, el.getAttribute('aria-label'), el.getAttribute('placeholder')];
+    return SENSITIVE_WORDS.test(words(names.filter(Boolean).join(' ')));
+  };
+  // A masked value: the same mark whatever its length, so the overlay reveals nothing about it.
+  const MASK = '•••';
+  // shared-block: sensitive-field end
   const clock = () => new Date().toLocaleTimeString('en-GB');
 
   const add = (kind, text) => {
@@ -100,7 +128,12 @@
   };
 
   const act = (kind, sel, detail) => {
-    if (kind === 'key') { add('key', String(sel)); return 'ok'; }
+    if (kind === 'key') {
+      // A printable key the agent types into a masked field is not logged: one mark per key tells its length.
+      if (String(sel).length === 1 && secret(document.activeElement)) return 'ok';
+      add('key', String(sel));
+      return 'ok';
+    }
     const el = typeof sel === 'string' ? document.querySelector(sel) : sel;
     if (!el) { add('nav', 'not found: ' + sel); return 'not found'; }
     const r = el.getBoundingClientRect();
@@ -110,7 +143,7 @@
     else if (kind === 'hover') { box(el, 'hover', 'hover ' + describe(el)); add('hover', describe(el)); }
     else if (kind === 'focus') { box(el, 'focus', 'focus ' + describe(el)); add('focus', describe(el)); }
     else if (kind === 'input') {
-      const v = secret(el) ? '\u2022\u2022\u2022' : String(detail ?? '').slice(0, 40);
+      const v = secret(el) ? MASK : String(detail ?? '').slice(0, 40);
       box(el, 'focus', 'input ' + describe(el)); add('input', `${describe(el)} = "${v}"`);
     }
     return 'ok';

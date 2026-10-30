@@ -20,7 +20,15 @@ import yaml
 ROOT = Path(__file__).resolve().parent.parent
 SKILLS = ROOT / "skills"
 SHARED_REFS = ROOT / "references"
+# Canonical scripts several skills bundle, such as scripts/mutate.mjs, and blocks of code that
+# self-contained scripts embed between "shared-block: <name> start/end" comments.
+SHARED_SCRIPTS = ROOT / "scripts"
+SHARED_BLOCKS = SHARED_SCRIPTS / "blocks"
 EVALS = ROOT / "evals"
+SHARED_BLOCK_RE = re.compile(
+    r"(?P<start>[ \t]*// shared-block: (?P<name>[\w-]+) start\n)(?P<body>.*?)(?P<end>[ \t]*// shared-block: (?P=name) end\n)",
+    re.DOTALL,
+)
 
 ALLOWED_KEYS = {"name", "description", "license", "compatibility", "metadata", "allowed-tools"}
 NAME_RE = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
@@ -96,21 +104,64 @@ def check_references(skill_dir, errors):
 
 
 def check_shared_copies(skill_dir, fix, errors):
-    refs = skill_dir / "references"
-    if not refs.is_dir():
-        return
-    for copy in refs.iterdir():
-        canonical = SHARED_REFS / copy.name
-        if canonical.is_file() and not filecmp.cmp(canonical, copy, shallow=False):
-            if fix:
-                shutil.copyfile(canonical, copy)
-                print(f"fixed: {copy.relative_to(ROOT)}")
-            else:
-                errors.append(f"references/{copy.name} differs from canonical references/{copy.name} (run with --fix)")
+    """A skill's copy of a shared reference or script must match the canonical file."""
+    for folder, canonical_dir in (("references", SHARED_REFS), ("scripts", SHARED_SCRIPTS)):
+        copies = skill_dir / folder
+        if not copies.is_dir():
+            continue
+        for copy in copies.iterdir():
+            canonical = canonical_dir / copy.name
+            if copy.is_file() and canonical.is_file() and not filecmp.cmp(canonical, copy, shallow=False):
+                if fix:
+                    shutil.copyfile(canonical, copy)
+                    print(f"fixed: {copy.relative_to(ROOT)}")
+                else:
+                    errors.append(f"{folder}/{copy.name} differs from canonical {folder}/{copy.name} (run with --fix)")
+
+
+def check_shared_blocks(skill_dir, fix, errors):
+    """A block embedded in a self-contained script must match scripts/blocks/<name>.js."""
+    for script in sorted(skill_dir.rglob("*.js")) + sorted(skill_dir.rglob("*.mjs")):
+        text = script.read_text(encoding="utf-8")
+        fixed = text
+        for match in SHARED_BLOCK_RE.finditer(text):
+            canonical = SHARED_BLOCKS / f"{match.group('name')}.js"
+            rel = script.relative_to(skill_dir)
+            if not canonical.is_file():
+                errors.append(f"{rel}: shared block '{match.group('name')}' has no scripts/blocks/{canonical.name}")
+                continue
+            body = canonical.read_text(encoding="utf-8")
+            if match.group("body") != body:
+                if fix:
+                    fixed = fixed.replace(match.group(0), match.group("start") + body + match.group("end"), 1)
+                else:
+                    errors.append(f"{rel}: shared block '{match.group('name')}' differs from scripts/blocks/{canonical.name} (run with --fix)")
+        if fixed != text:
+            script.write_text(fixed, encoding="utf-8", newline="\n")
+            print(f"fixed: {script.relative_to(ROOT)}")
+
+
+def check_eval_ownership(skill_dirs):
+    """A prompt that should trigger two skills leaves the agent no right answer."""
+    owners = {}
+    for skill_dir in skill_dirs:
+        path = EVALS / f"{skill_dir.name}.json"
+        try:
+            cases = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        for case in cases if isinstance(cases, list) else []:
+            if isinstance(case, dict) and case.get("should_trigger") is True and isinstance(case.get("query"), str):
+                owners.setdefault(case["query"].strip().lower(), []).append(skill_dir.name)
+    return [
+        f"'{query[:60]}' should trigger {', '.join(names)}"
+        for query, names in sorted(owners.items())
+        if len(names) > 1
+    ]
 
 
 def check_scripts(skill_dir, errors):
-    for script in skill_dir.rglob("*.js"):
+    for script in sorted(skill_dir.rglob("*.js")) + sorted(skill_dir.rglob("*.mjs")):
         try:
             result = subprocess.run(["node", "--check", str(script)], capture_output=True, text=True)
         except FileNotFoundError:
@@ -180,6 +231,7 @@ def main():
                 errors.append(f"SKILL.md exceeds {MAX_SKILL_LINES} lines; move detail into references/")
             check_references(skill_dir, errors)
         check_shared_copies(skill_dir, fix, errors)
+        check_shared_blocks(skill_dir, fix, errors)
         check_scripts(skill_dir, errors)
         check_evals(skill_dir, errors)
         if errors:
@@ -188,6 +240,8 @@ def main():
     known = {p.name for p in skill_dirs}
     for orphan in sorted(p.stem for p in EVALS.glob("*.json") if p.stem not in known):
         failures.setdefault("evals", []).append(f"evals/{orphan}.json has no matching skill")
+    for shared in check_eval_ownership(skill_dirs):
+        failures.setdefault("evals", []).append(shared)
 
     for name, errors in failures.items():
         print(f"FAIL {name}")

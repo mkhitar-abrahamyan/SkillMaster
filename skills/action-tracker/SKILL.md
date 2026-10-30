@@ -18,7 +18,8 @@ Logs every hover, click, focus, key and input on the page, whether performed by 
 ## Behavior
 
 - White cursor arrow follows the pointer; red ripple and box on click; dashed blue box on hover; green box on focus/input.
-- Bottom-right panel titled "All actions" lists the last 8 timestamped lines: HOVER, CLICK (x,y), FOCUS, KEY, INPUT. Password values are masked.
+- Bottom-right panel titled "All actions" lists the last 8 timestamped lines: HOVER, CLICK (x,y), FOCUS, KEY, INPUT.
+- Values are masked as `•••`, whatever their length, in sensitive fields: passwords (and a field that was one before a "show password" toggle), hidden inputs, payment fields, one-time codes, API keys and tokens, PINs, bank and government IDs, by `type`, `autocomplete`, or the words of a field's name, id, label, or placeholder. A printable key typed into such a field is not logged at all. Add `data-tracker-mask` to mask any other field. Ordinary text, email, and phone fields are shown.
 - Closed shadow root, `pointer-events: none`: does not intercept clicks or alter page styles.
 - Lost on reload or full navigation; reinstall. In-app route changes keep it.
 - When debugging is finished (before the final answer), always run `() => { if (window.__actionTracker) { window.__actionTracker.off(); delete window.__actionTracker; } return !document.getElementById('__action-tracker-host'); }` so no overlay stays on the user's page.

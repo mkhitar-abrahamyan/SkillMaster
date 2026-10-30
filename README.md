@@ -141,9 +141,12 @@ Copy-Item -Recurse SkillMaster\skills\bug-reproducer "$HOME\.claude\skills\"
   what the page shows and act as you. They stay within the requested scope, do not read cookies or
   stored credentials, and remove their overlays when done. Enable remote debugging only while you
   need it, ideally in a profile without unrelated signed-in sessions.
-- Typed values that the action-tracker overlay considers sensitive are masked in both its input and
-  keystroke lines, because the overlay appears in screenshots. The policy is the `secret()` function
-  in [action-tracker-all.js](skills/action-tracker/scripts/action-tracker-all.js).
+- Both tracker overlays mask what is typed into sensitive fields, because the overlay appears in
+  screenshots: passwords, payment fields, one-time codes, API keys and tokens, PINs, and bank and
+  government IDs show as `•••` whatever their length, and their keystrokes are not logged. A field
+  stays masked after a "show password" toggle, and `data-tracker-mask` masks any other field. The
+  policy is [scripts/blocks/sensitive-field.js](scripts/blocks/sensitive-field.js), embedded in both
+  overlays, and `tools/test_trackers.mjs` proves it in headless Chrome on every push.
 
 ## Repository layout
 

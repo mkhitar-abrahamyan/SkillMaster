@@ -59,16 +59,35 @@
       .replace(/\s+/g, ' ').trim().slice(0, 40);
     return `${t}${id}${name}${label ? ' "' + label + '"' : ''}`;
   };
-  // Returns true when the element's value must never appear in the overlay. It drives masking of
-  // both INPUT values and per-character KEY lines, and the overlay is visible in screenshots.
+  // shared-block: sensitive-field start
+  // Whether an element's value must never appear in the overlay, which shows in screenshots. It errs
+  // toward masking: credentials, payment fields, one-time codes, bank and government IDs, hidden
+  // inputs, and anything marked data-tracker-mask. A field seen once as a password stays masked
+  // after a "show password" toggle turns it into text. Ordinary text, email, and phone fields show.
+  const SENSITIVE_AUTOCOMPLETE = /(^|\s)(cc-|one-time-code|current-password|new-password)/i;
+  // Matched against whole words of a field's name, id, label, and placeholder: "newPassword" and
+  // "user_pin" are sensitive, "passenger", "footprint", and "pinned" are not.
+  const SENSITIVE_WORDS =
+    /\b(pw|pwd|pass|password|passwd|passcode|passphrase|secret|token|otp|pin|ssn|iban|cvv|cvc|api ?key|private ?key|security ?code|card ?(number|num|no)|cc ?(number|num))\b/;
+  const words = (text) =>
+    text
+      .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+      .replace(/[^a-zA-Z0-9]+/g, ' ')
+      .toLowerCase();
+  const wasPassword = new WeakSet();
   const secret = (el) => {
-    if (!el || !el.tagName) return false;
-    // TODO(privacy policy): decide which fields are sensitive by default. Available signals:
-    //   el.type (password, email, tel, number, hidden), el.autocomplete (cc-number, cc-csc,
-    //   one-time-code, current-password, new-password, email, tel, street-address, bday),
-    //   el.name / el.id (token, secret, ssn, iban, pin), el.isContentEditable, el.tagName (TEXTAREA, SELECT).
-    return el.tagName === 'INPUT' && /password/i.test(el.type || '');
+    if (!el || !el.getAttribute) return false;
+    const field = el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable;
+    if (!field) return false;
+    if (el.type === 'password') wasPassword.add(el);
+    if (wasPassword.has(el) || el.type === 'hidden' || el.hasAttribute('data-tracker-mask')) return true;
+    if (SENSITIVE_AUTOCOMPLETE.test(el.getAttribute('autocomplete') || '')) return true;
+    const names = [el.getAttribute('name'), el.id, el.getAttribute('aria-label'), el.getAttribute('placeholder')];
+    return SENSITIVE_WORDS.test(words(names.filter(Boolean).join(' ')));
   };
+  // A masked value: the same mark whatever its length, so the overlay reveals nothing about it.
+  const MASK = '•••';
+  // shared-block: sensitive-field end
   const clock = () => new Date().toLocaleTimeString('en-GB');
 
   const add = (kind, text) => {
@@ -128,13 +147,14 @@
       add('focus', describe(e.target));
     },
     keydown: (e) => {
+      // A printable key in a masked field is not logged at all: even one mark per key tells its length.
+      if (e.key.length === 1 && secret(document.activeElement)) return;
       const mods = ['Control', 'Alt', 'Shift', 'Meta'].filter((m) => e[m.toLowerCase() + 'Key'] && e.key !== m);
-      const key = secret(document.activeElement) && e.key.length === 1 ? '\u2022' : e.key;
-      add('key', [...mods, key].join('+'));
+      add('key', [...mods, e.key].join('+'));
     },
     input: (e) => {
       const el = e.target;
-      const v = secret(el) ? '\u2022'.repeat(String(el.value || '').length) : String(el.value ?? '').slice(0, 40);
+      const v = secret(el) ? MASK : String(el.value ?? '').slice(0, 40);
       box(el, 'focus', 'input ' + describe(el));
       add('input', `${describe(el)} = "${v}"`);
     },

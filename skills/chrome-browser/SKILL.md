@@ -35,7 +35,8 @@ Chrome DevTools MCP interactions are CDP-driven, so the user sees no cursor. Bef
 
 - Source: `scripts/action-tracker-agent.js` (next to this file) (one arrow function). Read it and pass its body unchanged as `evaluate_script` `function` with `waitForStableDom: false`. Idempotent.
 - It attaches NO page listeners: CDP input events are `isTrusted` and indistinguishable from user input, so the agent reports each action itself. Right before/after each MCP interaction call `evaluate_script` (`waitForStableDom: false`) with `() => window.__actionTracker.act(kind, selector, detail)`:
-  - `kind` is `hover`, `click`, `focus`, `input` (detail = typed text; password values masked) or `key` (second arg = key name, e.g. `act('key','Backspace')`).
+  - `kind` is `hover`, `click`, `focus`, `input` (detail = typed text) or `key` (second arg = key name, e.g. `act('key','Backspace')`).
+  - Values are masked as `•••`, whatever their length, in sensitive fields: passwords (and a field that was one before a "show password" toggle), hidden inputs, payment fields, one-time codes, API keys and tokens, PINs, bank and government IDs, by `type`, `autocomplete`, or the words of a field's name, id, label, or placeholder. A printable key typed into such a field is not logged at all. Add `data-tracker-mask` to mask any other field. Ordinary text, email, and phone fields are shown.
   - `act` moves the cursor arrow to the element center, draws a ripple (click), a dashed blue box (hover) or a green box (focus/input), and adds a timestamped line to the bottom-right panel (last 8 actions).
   - `note("Step: ...")` adds a NAV line to label the next step; `clear()` empties the log; `off()` removes the overlay.
 - The overlay lives in a closed shadow root with `pointer-events: none`, so it does not intercept clicks or touch page styles. It is lost on reload or full navigation; reinstall afterwards. In-app route changes keep it.

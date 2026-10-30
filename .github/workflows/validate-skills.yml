@@ -21,3 +21,6 @@ jobs:
       # Node.js is preinstalled on GitHub-hosted Ubuntu runners and is used for `node --check`.
       - name: Validate skills, references, scripts, evals, and plugin manifests
         run: python tools/validate_skills.py
+      # Chrome is preinstalled on GitHub-hosted Ubuntu runners; under CI a missing browser fails the step.
+      - name: Prove the tracker overlays mask sensitive fields, in headless Chrome
+        run: node tools/test_trackers.mjs

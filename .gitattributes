@@ -1,0 +1,6 @@
+# Every text file is checked out with LF, whatever core.autocrlf says, so a checkout on Windows matches
+# the repository byte for byte and edits, diffs, and shared-file checks see the same text everywhere.
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.gif binary
