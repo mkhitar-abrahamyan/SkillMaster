@@ -42,6 +42,10 @@ each new test can fail.
    behavior. Then, in the isolated copy, apply the smallest mutation that breaks that specific
    behavior (invert a condition, drop the error branch, shift the boundary) and confirm the test
    fails. A test that survives its mutation does not test the behavior; rewrite or discard it.
+   Run mutations with `scripts/mutate.mjs`, beside this file: list each as `{ "name", "file", "from", "to" }`
+   with the test command in a JSON file, then `node scripts/mutate.mjs mutants.json --root <isolated copy>`.
+   It requires a green baseline, applies each mutant alone, restores every file, and reports each as
+   `killed`, `survived`, `timeout`, or `missing`.
 6. **Run the affected suite** to confirm the new tests pass alongside existing ones and in any order.
 
 ## Output

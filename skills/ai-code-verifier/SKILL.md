@@ -11,7 +11,7 @@ installed code, the package registry, or a command you ran.
 
 ## Boundary and safety
 
-- Keep the reviewed change unchanged. Follow [Repository](references/repository.md) for target
+- Keep the reviewed change unchanged; mutations run only in an isolated copy. Follow [Repository](references/repository.md) for target
   selection, isolated verification writes, and P0–P3 priorities.
 - Check package existence and identity through registry metadata only. Installing an unknown,
   newly published, or near-miss package to test it is the attack this skill guards against;
@@ -39,7 +39,13 @@ installed code, the package registry, or a command you ran.
 5. **Test claims.** Re-run every test the AI claims passes, on the target revision. Confirm those
    tests exist, are not skipped or focus-filtered, execute the changed code, and assert on
    behavior rather than on constants or on a mock of the unit under test. Check whether existing
-   tests or assertions were deleted or weakened in the change.
+   tests or assertions were deleted or weakened in the change. For a claimed test of changed
+   behavior, break that behavior in an isolated copy: a test that still passes does not test what
+   the claim says, which settles the claim as `contradicted`.
+   Run mutations with `scripts/mutate.mjs`, beside this file: list each as `{ "name", "file", "from", "to" }`
+   with the test command in a JSON file, then `node scripts/mutate.mjs mutants.json --root <isolated copy>`.
+   It requires a green baseline, applies each mutant alone, restores every file, and reports each as
+   `killed`, `survived`, `timeout`, or `missing`.
 6. **AI-specific defect patterns.** In the changed code, look for leftover placeholders, stubs, or
    TODOs; invented constants presented as real (limits, IDs, endpoints); happy-path-only handling;
    swallowed errors and fallbacks that hide failure; missing `await`; hard-coded credentials or

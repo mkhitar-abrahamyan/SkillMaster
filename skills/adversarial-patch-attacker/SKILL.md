@@ -1,6 +1,6 @@
 ---
 name: adversarial-patch-attacker
-description: Attempt to break a specified code change with focused reproduction tests or scripts. Use only when the user asks to attack, stress-test, fuzz, or try to break a patch; ordinary code-review requests belong to a review skill.
+description: Use only when the user explicitly asks to attack, stress-test, fuzz, or try to break a specific patch or change, with focused reproduction tests or scripts. Ordinary review requests belong to ruthless-code-reviewer, and bug reports to bug-reproducer.
 license: MIT
 ---
 

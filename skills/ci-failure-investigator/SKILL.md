@@ -15,16 +15,22 @@ The first meaningful failure explains the run; most later failures are fallout f
   changing secrets or variables, and pushing each need the user's explicit approval.
 - Leave secret values masked. Logs show secrets as `***`; do not attempt to recover them, and do
   not print repository secrets or variables.
-- When `gh` is unavailable or unauthenticated, ask for the run URL or the log text.
+- When `gh` is unavailable or unauthenticated, offer to install it (`winget install GitHub.cli`,
+  `brew install gh`, or the distribution's package). With the user's explicit go-ahead, the GitHub
+  REST API works too, with a token they already have configured, such as git's credential helper
+  (`git credential fill` for `github.com`): read it into a variable, never print, echo, log, or write
+  it, and use it only to read this repository's runs. Otherwise ask for the run URL or the log text.
 
 ## Workflow
 
 1. **Identify the run.** Resolve the workflow, run ID, attempt, commit SHA, branch or PR, and
    trigger event:
    `gh run view <run-id> --json workflowName,attempt,headSha,headBranch,event,conclusion,jobs`.
-   For a PR, list its checks with `gh pr checks <pr>`.
+   For a PR, list its checks with `gh pr checks <pr>`. Without `gh`, the same comes from
+   `GET /repos/{owner}/{repo}/actions/runs/{run_id}` and `.../runs/{run_id}/jobs`.
 2. **Find the first meaningful failure.** Fetch failed-step logs with
-   `gh run view <run-id> --log-failed`, or one job with `gh run view --job <job-id> --log`. Order
+   `gh run view <run-id> --log-failed`, or one job with `gh run view --job <job-id> --log`; without
+   `gh`, `GET /repos/{owner}/{repo}/actions/jobs/{job_id}/logs`, which redirects to the log text. Order
    failures by job dependencies and time, and pick the earliest failing step of the earliest
    failing job. In its log, find the first error rather than the last line. Generic exit-code
    lines, post-job cleanup, and jobs skipped or cancelled after an earlier failure are fallout.

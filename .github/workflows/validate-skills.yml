@@ -24,3 +24,5 @@ jobs:
       # Chrome is preinstalled on GitHub-hosted Ubuntu runners; under CI a missing browser fails the step.
       - name: Prove the tracker overlays mask sensitive fields, in headless Chrome
         run: node tools/test_trackers.mjs
+      - name: Prove the mutation runner kills, restores, and refuses as documented
+        run: node tools/test_mutate.mjs

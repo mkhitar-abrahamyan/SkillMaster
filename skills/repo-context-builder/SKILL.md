@@ -36,6 +36,9 @@ repository without asking again. Every command and convention in it states where
    `azure-pipelines.yml`, `Jenkinsfile`) over READMEs, because CI shows what actually runs.
    Collect install, build, full test, single test, lint, type-check, format, and dev-server
    commands, plus required runtime versions and services such as databases, queues, or Compose.
+   Record commands whose order matters, such as a generator that must run before a check that reads
+   its output, in the order CI runs them, and platform differences such as line endings or a shell
+   that behaves differently on Windows.
 4. **Architecture.** Identify entry points (bootstrap, server, CLI, routes, handlers), layers, and
    module boundaries. Trace one representative request or data flow end to end through real files.
    For monorepos, describe each package in one line.
@@ -70,6 +73,8 @@ For a draft `AGENTS.md`, keep the same sections but phrase each line as an instr
 |------|---------|------------|
 | Install | ... | documented (CI: .github/workflows/ci.yml) |
 | Test one file | ... | verified |
+
+Order: `generate` before `check` — why, and what fails otherwise.
 
 ## Architecture
 Entry points, layers, and one traced flow: `a.ts` -> `b.ts` -> `c.ts`.

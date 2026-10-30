@@ -1,6 +1,6 @@
 ---
 name: ruthless-code-reviewer
-description: Perform a read-only, defect-first review of a specified code change and report only actionable findings introduced by that change. Use for diffs, commits, uncommitted changes, or pasted review targets when a rigorous regression, security, or maintainability review is requested.
+description: Use when the user asks to review a diff, commit, branch, pull request, or uncommitted changes for bugs, regressions, security, or maintainability problems, such as before merging. Performs a read-only, defect-first review that reports only actionable findings introduced by the change. Not for attacking a patch with reproduction tests, which belongs to adversarial-patch-attacker.
 license: MIT
 ---
 

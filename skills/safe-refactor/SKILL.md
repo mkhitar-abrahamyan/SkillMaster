@@ -32,7 +32,12 @@ small reversible steps, and compare the result with the baseline.
    baseline can run, stop and ask before refactoring.
 4. **Characterize gaps.** Where the code to change has weak coverage, first add characterization
    tests that capture current outputs for representative and edge inputs, surprising behavior
-   included. They must pass on the untouched code.
+   included. They must pass on the untouched code, and fail when the behavior they capture breaks.
+   Run mutations with `scripts/mutate.mjs`, beside this file: list each as `{ "name", "file", "from", "to" }`
+   with the test command in a JSON file, then `node scripts/mutate.mjs mutants.json --root <isolated copy>`.
+   It requires a green baseline, applies each mutant alone, restores every file, and reports each as
+   `killed`, `survived`, `timeout`, or `missing`. A characterization test that survives does not pin
+   the behavior: strengthen it before refactoring.
 5. **Refactor in steps.** Make one mechanical kind of change per step: rename, extract, inline,
    move, split, or change a signature behind an adapter. After each step, run the type-check or
    build and the baseline tests. When a step breaks something, revert that step and take a smaller

@@ -17,15 +17,19 @@ session's command results, not from memory.
 2. **Verification from this session.** For each check, record the exact command and its result,
    and whether it ran after the last edit to the files it covers. A check that ran before a later
    edit is `stale`. List checks that never ran as not run.
-3. **Decisions.** For each meaningful decision: what was chosen, why, and the alternative rejected.
+3. **In flight.** Work that is still running or waiting when the session ends: background jobs and
+   watchers, CI, deploy, or publish runs, registry or review waits, and servers, containers, or
+   tunnels started for the task. For each, how to check it and what to do when it finishes; say
+   when one must be stopped, and how.
+4. **Decisions.** For each meaningful decision: what was chosen, why, and the alternative rejected.
    Include user instructions and preferences that constrain the remaining work.
-4. **Dead ends and gotchas.** Approaches ruled out, with the evidence, so they are not repeated;
+5. **Dead ends and gotchas.** Approaches ruled out, with the evidence, so they are not repeated;
    environment quirks such as failing commands, required setup, and flaky tests.
-5. **Next actions** as an ordered list. The first must be executable without further discovery: an
+6. **Next actions** as an ordered list. The first must be executable without further discovery: an
    exact file, command, or question.
-6. **Size and safety.** Aim for 40–80 lines. Reference files and line numbers instead of pasting
+7. **Size and safety.** Aim for 40–80 lines. Reference files and line numbers instead of pasting
    code. Leave out secrets, tokens, and `.env` contents.
-7. **Delivery.** Print the handoff in the conversation. Write it to a file only when asked, at the
+8. **Delivery.** Print the handoff in the conversation. Write it to a file only when asked, at the
    path the user names or the project's designated notes location; commit it only when asked.
 
 ## Template
@@ -49,6 +53,9 @@ session's command results, not from memory.
 | Unit tests | `...` | 42 passed, 1 failed (`test name`) | yes |
 | Lint | `...` | not run — reason | — |
 
+## In flight
+- What is running or waiting — how to check it — what to do when it finishes
+
 ## Decisions
 - Decision — why — rejected alternative
 
@@ -63,4 +70,5 @@ session's command results, not from memory.
 2. ...
 ```
 
-Verification, Open questions, and Next actions say `None` when empty; omit other empty sections.
+Verification, In flight, Open questions, and Next actions say `None` when empty; omit other empty
+sections.

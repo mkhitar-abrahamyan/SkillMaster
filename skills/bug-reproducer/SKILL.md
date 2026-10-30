@@ -27,7 +27,10 @@ show the reproduction turn from red to green.
 2. **Reproduce before fixing.** Run the reported steps, then shrink them to the smallest
    deterministic reproduction at the lowest layer that still shows the symptom, preferably an
    automated test in the project's framework. Assert on the reported symptom, not on an incidental
-   error. Run it and keep the failing output.
+   error. Run it and keep the failing output. **When it fails only sometimes,** measure it: run
+   the reproduction many times (for example 50) and record the failure rate, and control clock,
+   randomness, ordering, and concurrency to raise it. On Windows and WSL, wait on the wall clock the
+   code reads rather than on timers, which can drift apart.
 3. **When it does not reproduce,** vary one factor at a time toward the reporter's environment:
    versions, configuration, data shape and size, locale and timezone, concurrency and timing,
    cache state, permissions. Use `git bisect` when a known-good revision exists. After a bounded
@@ -38,7 +41,10 @@ show the reproduction turn from red to green.
    symptom and from contributing factors. Search for the same faulty pattern elsewhere.
 5. **Fix minimally** at the root cause, with no unrelated refactoring or cleanup. When the right fix
    is large or changes a contract, stop and present options.
-6. **Verify red to green.** Show the reproduction failing before the fix and passing after it.
+6. **Verify red to green.** Show the reproduction failing before the fix and passing after it. For
+   an intermittent bug, red to green is a pair of rates: failures in N runs before, none in at
+   least N after, with N large enough that no failures is not luck (at a 1-in-10 rate, 50 clean
+   runs leave about a 0.5% chance).
    Run the affected module's tests, then the broader suite the project uses for that area. When a
    related test fails, run it on the unfixed revision to tell a new regression from a pre-existing
    failure.
@@ -55,7 +61,8 @@ Start with **Bug status:** and the first matching result:
 
 Then include the sections that apply:
 
-- **Reproduction:** command or test path, and the failing output (at most 15 lines).
+- **Reproduction:** command or test path, and the failing output (at most 15 lines); for an
+  intermittent bug, its failure rate before and after the fix.
 - **Root cause:** `file:line`, the mechanism in one paragraph, and confidence `verified` or
   `likely` with its evidence.
 - **Fix:** files changed and why the change addresses the root cause.

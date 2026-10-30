@@ -136,7 +136,9 @@ Copy-Item -Recurse SkillMaster\skills\bug-reproducer "$HOME\.claude\skills\"
 - No skill commits, pushes, re-runs CI, deploys, runs migrations against shared databases, or
   changes secrets without your explicit approval.
 - No skill reads `.env` files, secrets, credentials, or dumps; configuration shape comes from
-  example files.
+  example files. The one exception asks first: without the GitHub CLI, `ci-failure-investigator`
+  can read Actions logs with a token you already have configured, such as git's credential helper,
+  only with your go-ahead, and never prints or stores it.
 - Browser skills act in your real Chrome session through the DevTools protocol, so the agent can see
   what the page shows and act as you. They stay within the requested scope, do not read cookies or
   stored credentials, and remove their overlays when done. Enable remote debugging only while you
@@ -153,23 +155,29 @@ Copy-Item -Recurse SkillMaster\skills\bug-reproducer "$HOME\.claude\skills\"
 ```text
 skills/<name>/SKILL.md      one folder per skill; name matches the folder
 skills/<name>/references/   reference files the skill links to (copies of shared files are synced)
-skills/<name>/scripts/      scripts the skill runs
+skills/<name>/scripts/      scripts the skill runs (copies of shared scripts are synced)
 references/                 canonical shared review references
+scripts/                    canonical shared scripts, such as the mutation runner `mutate.mjs`
+scripts/blocks/             code embedded in self-contained scripts, such as the trackers' masking policy
 evals/<name>.json           trigger evals: prompts that should and should not activate each skill
 examples/                   end-to-end walkthroughs
 tools/validate_skills.py    the CI validator
+tools/test_*.mjs            tests of the shared scripts: the trackers' masking and the mutation runner
 .claude-plugin/             Claude Code plugin and marketplace manifests
 ```
 
 ## Contributing
 
 1. Keep every file a skill needs inside its folder; installs copy only that folder. Edit shared
-   references in `references/`, then run `python tools/validate_skills.py --fix` to sync the copies.
+   references in `references/`, shared scripts in `scripts/`, and embedded blocks in
+   `scripts/blocks/`, then run `python tools/validate_skills.py --fix` to sync the copies.
 2. Add `evals/<skill>.json` with at least three prompts that should trigger the skill and three
    near-misses that should not.
-3. Run `python tools/validate_skills.py`. CI runs the same check on every push and pull request:
-   frontmatter against the spec, links and bundled paths, shared-reference drift, JavaScript syntax,
-   eval coverage, and plugin manifests.
+3. Run `python tools/validate_skills.py`, `node tools/test_trackers.mjs`, and
+   `node tools/test_mutate.mjs`. CI runs the same on every push and pull request: frontmatter against
+   the spec, links and bundled paths, drift of shared references, scripts, and blocks, JavaScript
+   syntax, eval coverage and prompts claimed by two skills, plugin manifests, and the shared scripts'
+   own tests.
 
 To measure how reliably a description triggers, run the eval set with the
 [skill-creator](https://github.com/anthropics/skills) plugin's `run_eval.py`, from that skill's

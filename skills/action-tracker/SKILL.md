@@ -1,6 +1,6 @@
 ---
 name: action-tracker
-description: Install a visible overlay in a Chrome tab that logs ALL pointer and keyboard actions (user and agent) with a cursor, click ripples, hover/focus boxes and an action log. Use when the user wants to watch or record every interaction on a page; for agent-only tracking use chrome-browser.
+description: Use when the user wants a visible overlay in a Chrome tab that logs every pointer and keyboard action, theirs and the agent's, with a cursor, click ripples, hover and focus boxes, and an action log, to watch or record an interaction. To show only the agent's own actions, use chrome-browser.
 license: MIT
 compatibility: Requires the Chrome DevTools MCP server (chrome-devtools) connected to a running Chrome with remote debugging enabled.
 ---

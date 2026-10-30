@@ -31,7 +31,10 @@ rediscovering context. Ground every step in the code; write no production code h
    contracts, or scope. Record every other open decision as an assumption with the chosen default.
 4. **Requirements.** Functional requirements; the non-functional ones that apply (security and
    authorization, performance, accessibility, internationalization, observability, backward
-   compatibility); and explicit out-of-scope items.
+   compatibility); and explicit out-of-scope items. For a library, an SDK, or a public API, classify
+   the change under the project's versioning policy as a patch, a minor, or a major change; a
+   breaking change names its deprecation path, its migration note, and whether an opt-out can keep
+   the old behavior for a release.
 5. **Acceptance criteria.** Numbered `AC1…ACn`, each an observable `Given / When / Then`. Cover
    failure, validation, and permission cases as well as the happy path.
 6. **Impacted modules.** Exact paths, each marked `modify` (verified to exist) or `create`
@@ -61,7 +64,7 @@ Then fill in this structure:
 ```markdown
 ## Summary
 ## Assumptions            (each with the default chosen)
-## Requirements           (functional / non-functional / out of scope)
+## Requirements           (functional / non-functional / compatibility / out of scope)
 ## Acceptance criteria    (AC1..ACn, Given / When / Then)
 ## Impacted modules       (path — modify | create — reason)
 ## Implementation steps   (1..n: files, change, edge cases, reuse, verify:)
