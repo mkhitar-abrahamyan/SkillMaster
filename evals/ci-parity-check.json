@@ -1,5 +1,9 @@
 [
   {
+    "query": "Check CI parity for my current implementation, including my staged fixes, unstaged edits, and new untracked tests. Nothing is committed yet.",
+    "should_trigger": true
+  },
+  {
     "query": "Tests pass on my Windows machine. Will they pass on the Linux CI before I push the tag?",
     "should_trigger": true
   },

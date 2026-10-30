@@ -85,10 +85,13 @@ function chrome() {
     .find((candidate) => existsSync(candidate));
 }
 
-const SECRETS = ['hunter2', '4242424242424242', '918273', 'sk-live-abc123', 'k3ep-s3cret'];
+const SECRETS = ['hunter2', '4242424242424242', '918273', 'sk-live-abc123', 'k3ep-s3cret', 'label-only-731', 'wrapped-only-852', 'aria-only-963'];
 const page = `<!doctype html><meta charset="utf-8">
 <input id="pw" type="password"><input id="card" autocomplete="cc-number"><input id="otp" autocomplete="one-time-code">
 <input id="key" name="apiKey"><input id="who" name="displayName">
+<label for="field1">API key</label><input id="field1">
+<label>Security code<input id="field2"></label>
+<span id="field-title">Private</span><span id="field-kind">key</span><textarea id="field3" aria-labelledby="field-title field-kind"></textarea>
 <div id="notes" contenteditable data-tracker-mask><b id="bold"></b></div>
 <pre id="out"></pre>
 <script>
@@ -115,6 +118,9 @@ type('pw', '2');
 type('card', '4242424242424242');
 type('otp', '918273');
 type('key', 'sk-live-abc123');
+type('field1', 'label-only-731');
+type('field2', 'wrapped-only-852');
+type('field3', 'aria-only-963');
 type('who', 'Ana');
 // A masked editable region, typed into through the bold text inside it, then hovered there: the
 // element's description must not carry what was typed.
@@ -130,6 +136,8 @@ bold.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, clientX: 5, clie
 results.all = shown();
 // The whole log, past the eight lines shown, masked as shown.
 results.allExport = window.__actionTracker.export();
+results.allTest = window.__actionTracker.test();
+results.allStorage = JSON.stringify(sessionStorage);
 // Not one key line for a masked field: even a mark per key would tell its length.
 window.__actionTracker.clear();
 type('card', '42');
@@ -158,6 +166,9 @@ act('input', '#pw', 'hunter2');
 act('input', '#card', '4242424242424242');
 act('input', '#otp', '918273');
 act('input', '#key', 'sk-live-abc123');
+act('input', '#field1', 'label-only-731');
+act('input', '#field2', 'wrapped-only-852');
+act('input', '#field3', 'aria-only-963');
 act('input', '#who', 'Ana');
 act('input', '#notes', 'k3ep-s3cret');
 act('key', 'Enter');
@@ -209,6 +220,8 @@ results.sidebarCoveredBefore = overlapsSidebar();
 act('click', '#sidebar');
 results.sidebarCleared = !overlapsSidebar() && !panelEl.classList.contains('collapsed');
 results.agentExport = window.__actionTracker.export();
+results.agentTest = window.__actionTracker.test();
+results.agentStorage = JSON.stringify(sessionStorage);
 window.__actionTracker.off();
 document.getElementById('out').textContent = 'RESULT ' + JSON.stringify(results);
 </script>`;
@@ -256,6 +269,10 @@ const reported = /<pre id="out">RESULT ([\s\S]*?)<\/pre>/.exec(dom)?.[1];
 assert.ok(reported, `the page reported what the overlays showed:\n${dom.slice(0, 1_500)}`);
 const results = JSON.parse(reported.replaceAll('&quot;', '"').replaceAll('&amp;', '&').replaceAll('&lt;', '<').replaceAll('&gt;', '>'));
 const { allMaskedKeys, agentMaskedKeys, all, agent, allExport } = results;
+for (const artifact of ['allExport', 'agentExport', 'allTest', 'agentTest', 'allStorage', 'agentStorage']) {
+  assert.ok(results[artifact]?.length > 0, `${artifact} was captured`);
+  for (const value of SECRETS) assert.ok(!results[artifact].includes(value), `${artifact} leaks ${value}`);
+}
 for (const [overlay, text] of Object.entries({ all, agent, export: allExport })) {
   assert.ok(text.length > 0, `the ${overlay} overlay shows its log`);
   for (const value of SECRETS) assert.ok(!text.includes(value), `the ${overlay} overlay shows ${value}:\n${text}`);

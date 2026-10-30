@@ -36,28 +36,33 @@ asks how to set it up for a tool, follow [Setup](references/setup.md), the guide
    `node <this skill's folder>/scripts/ctx.mjs init`. It updates the project's copy when this one
    is newer, as after SkillMaster was updated; the hooks run the project's copy. Then
    `node .context/ctx.mjs resume` prints the latest open record and what changed in git since it
-   was saved. With the hooks wired, a session already starts with it.
+   was saved. If this conversation already has a record, use `resume --file <record>` or
+   `resume --session <id>` instead; a resumed hook session selects its own record.
 2. **Start this conversation's record:** `node .context/ctx.mjs start --task <short task name>
    --agent <your tool, such as claude-code, codex, or aider>`, adding `--session <id>` when the
    session id is known, as the hooks tell it. In a project without `.context/`, run the copy beside
    this file, `node scripts/ctx.mjs start ...`, from the project's directory: it creates the
    folder. The new record carries over the last one's goal, next actions, decisions, dead ends,
    and open questions; keep the path it prints for `--file`. Use the task name the brief gives, so
-   the records chain; a new name starts a separate task.
+   the records chain; a new name starts a separate task. Start only once per conversation and
+   project. Later messages, compaction, and resuming the same session keep that record.
 3. **Verify before continuing.** Confirm the claims the next step depends on: read the files the
-   record names, and re-run stale checks with `node .context/ctx.mjs check -- <command>`, which
-   records the result and the code it ran on.
+   record names, and re-run stale checks with `node .context/ctx.mjs check --file <record> -- <command>`,
+   which records the result against the code present before it ran. Code changes during a check
+   make its result stale, even if the command exits successfully.
 4. **Keep the record current** as the work moves: edit its sections, or add a line with
-   `node .context/ctx.mjs note <done|next|decision|dead-end|question|note> "<text>"`, then
+   `node .context/ctx.mjs note <done|next|decision|dead-end|question|note> "<text>" --file <record>`, then
    `node .context/ctx.mjs save --file <record>`. Save after each meaningful step, not only at the
-   end: a conversation can stop at any reply.
+   end: a conversation can stop at any reply. `--session <id>` can replace `--file`; commands refuse
+   ambiguous ownership instead of choosing the newest conversation's record.
 5. **Before the conversation ends** or its context runs low, make the record enough to continue
    from: Done lists what this conversation finished, with paths; Next actions starts with a step
    that needs no discovery; each decision gives its reason and the alternative rejected; each dead
    end gives its evidence. Set `--status` to `in progress`, `blocked`, `ready for review`, or
    `done`, and save.
 6. **By themselves, when asked:** `node .context/ctx.mjs wire claude`, `wire codex`, or `wire all`.
-   Claude Code then starts every session with the latest record and saves this conversation's
+   Claude Code then starts a new session with the latest current task record, resumes an existing
+   session with its own record, and saves this conversation's
    record after each reply, creating it once files change, from `.claude/settings.local.json`.
    Codex does the same from `.codex/hooks.json`, once the user trusts the hooks with `/hooks` in
    Codex. Both files are kept out of git through `.git/info/exclude`; `unwire` removes the hooks.

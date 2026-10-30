@@ -50,7 +50,9 @@ Stage 2 depends on the task:
 - **In the browser.** A change to what a page shows or does is also checked in the running app
   with `chrome-browser`; unit tests alone do not show the page.
 - **Where CI runs.** When CI runs on another OS or runtime version than this machine, run
-  `ci-parity-check` before reporting `VERIFIED`; a check that passed only here is reported as
+  `ci-parity-check` before reporting `VERIFIED`, with the same complete stage-3 target, including
+  its uncommitted and relevant untracked files. Verify that the isolated copy contains that target;
+  a clean `HEAD` alone does not cover local changes. A check that passed only here is reported as
   passing here, not in CI.
 - **Approval.** Commits, pushes, deployments, migrations against shared databases, and secret
   access each need the user's explicit approval.

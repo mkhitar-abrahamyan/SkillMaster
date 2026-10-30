@@ -27,12 +27,16 @@ From then on the project has its own copy, and every tool uses that one:
 ```text
 node .context/ctx.mjs resume          where things stand, and what changed since the last save
 node .context/ctx.mjs start --task "csv export" --agent codex
-node .context/ctx.mjs note next "Quote fields that hold commas"
-node .context/ctx.mjs check -- npm test
+node .context/ctx.mjs note next "Quote fields that hold commas" --file <record>
+node .context/ctx.mjs check --file <record> -- npm test
 node .context/ctx.mjs save --file <record>
 node .context/ctx.mjs list
 node .context/ctx.mjs doctor          what could keep it from working, and the fix for each
 ```
+
+Keep the record path printed by `start`. Use it for this conversation's later messages and after
+compaction: `resume --file <record>` continues it without creating another. A known `--session <id>`
+can replace `--file`; ambiguous updates are refused. Resumed hook sessions select their own record.
 
 `.context/` has a `.gitignore` of its own, so git ignores it. Delete that file only to share the
 records with a team through git.
@@ -69,7 +73,7 @@ every save.
 
 - **Aider:** `aider --model ollama_chat/<model> --read .context/BRIEF.md`, or once, in
   `.aider.conf.yml`: `read: .context/BRIEF.md`. Save progress with `/run node .context/ctx.mjs
-  note done "..."` and the like.
+  note done "..." --file <record>` and the like.
 - **opencode:** add `".context/BRIEF.md"` to `instructions` in `opencode.json`.
 - **A plain chat**, such as `ollama run` or Open WebUI: `node .context/ctx.mjs resume --copy` puts
   the brief on the clipboard to paste. To keep what the chat decided, ask it for its done items,
@@ -85,8 +89,11 @@ Codex, opencode, Cursor, and GitHub Copilot read `AGENTS.md`. To have any of the
 hooks, add this to it; it is committed, so it is a change for the whole team:
 
 ```markdown
-If `.context/` exists, run `node .context/ctx.mjs resume` before starting, start this
-conversation's record with `node .context/ctx.mjs start`, and save it as the work moves.
+Refresh the local script with the installed context-keeper skill's `scripts/ctx.mjs init`.
+In a new conversation, run `node .context/ctx.mjs resume`, then start one record with
+`node .context/ctx.mjs start --task <task> --agent <tool>` and retain its path. In the same
+conversation, including after compaction, reuse that path with `resume --file <record>`.
+Use `--file <record>` (or the known `--session <id>`) for note, check, and save as work moves.
 ```
 
 ## 6. Check that it works

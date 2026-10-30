@@ -9,16 +9,17 @@
  */
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { linkSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const runner = fileURLToPath(new URL('../scripts/mutate.mjs', import.meta.url));
 const project = mkdtempSync(path.join(tmpdir(), 'skillmaster-mutate-'));
+const external = mkdtempSync(path.join(tmpdir(), 'skillmaster-mutate-external-'));
 // The Node running this test, wherever it lives, so the commands do not depend on PATH.
 const node = JSON.stringify(process.execPath);
-const hang = `${node} -e "setTimeout(() => {}, 60000)"`;
+const hang = `${node} conditional-hang.mjs`;
 const write = (file, text) => writeFileSync(path.join(project, file), text);
 const read = (file) => readFileSync(path.join(project, file));
 
@@ -45,6 +46,7 @@ try {
     ].join('\n'),
   );
   write('twice.mjs', 'export const a = 1;\nexport const b = 1;\n');
+  write('conditional-hang.mjs', "import { discount } from './discount.mjs';\nif (discount(100) !== 90) setTimeout(() => {}, 60000);\n");
   const before = { discount: read('discount.mjs'), twice: read('twice.mjs') };
   const mutants = (list, extra = {}) => {
     write('mutants.json', JSON.stringify({ test: `${node} discount.test.mjs`, mutants: list, ...extra }));
@@ -86,7 +88,7 @@ try {
   assert.deepEqual(read('discount.mjs'), before.discount, 'restored byte for byte, CRLF included');
   assert.deepEqual(read('twice.mjs'), before.twice);
 
-  // A slow test is a timeout, which counts as caught.
+  // A test that passes before mutation but hangs afterward counts as caught.
   const slow = mutants(
     [{ name: 'boundary shifted', file: 'discount.mjs', from: 'total >= 100', to: 'total > 100', test: hang }],
     { timeoutSeconds: 2 },
@@ -94,6 +96,25 @@ try {
   assert.equal(slow.report.results[0].outcome, 'timeout');
   assert.equal(slow.status, 0, 'every mutant caught');
   assert.deepEqual(read('discount.mjs'), before.discount);
+
+  // An override must pass independently before any mutant is applied.
+  const badOverride = mutants([{ name: 'bad override', file: 'discount.mjs', from: 'total >= 100', to: 'total > 100', test: `${node} -e "process.exit(1)"` }]);
+  assert.equal(badOverride.status, 2);
+  assert.match(badOverride.stderr, /baseline fails/);
+  assert.deepEqual(read('discount.mjs'), before.discount);
+
+  // Both directory links (junctions on Windows) and shared hard links escape isolation.
+  const externalFile = path.join(external, 'outside.mjs');
+  writeFileSync(externalFile, 'export const value = 1;\n');
+  const externalBefore = readFileSync(externalFile);
+  symlinkSync(external, path.join(project, 'linked'), process.platform === 'win32' ? 'junction' : 'dir');
+  linkSync(externalFile, path.join(project, 'hard-linked.mjs'));
+  for (const [file, message] of [['linked/outside.mjs', /outside/], ['hard-linked.mjs', /hard-linked/]]) {
+    const escaped = mutants([{ name: 'linked escape', file, from: '= 1', to: '= 2' }]);
+    assert.equal(escaped.status, 2);
+    assert.match(escaped.stderr, message);
+    assert.deepEqual(readFileSync(externalFile), externalBefore, 'outside contents remain untouched');
+  }
 
   // Refused before anything is touched.
   write('discount.test.mjs', "import assert from 'node:assert/strict';\nassert.equal(1, 2);\n");
@@ -107,4 +128,5 @@ try {
   console.log('ok - the mutation runner: killed, survived, missing, timeout, restored, and refusals');
 } finally {
   rmSync(project, { recursive: true, force: true });
+  rmSync(external, { recursive: true, force: true });
 }

@@ -10,8 +10,10 @@
  *                                              this conversation's record, carried on from the last
  *   node ctx.mjs save [--file <record>] [--status <status>] [--mask]
  *   node ctx.mjs note <done|next|decision|dead-end|question|note> <text> [--file <record>]
- *   node ctx.mjs check [--task <name>] -- <command>   run a check and remember its result
- *   node ctx.mjs resume [--task <name>] [--full] [--copy]
+ *   node ctx.mjs check [--file <record>] [--task <name>] -- <command>
+ *   node ctx.mjs resume [--file <record>] [--task <name>] [--full] [--copy]
+ *   save, note, check, resume also accept --session <id> instead of --file.
+ *   When several records match, save/note/check require an explicit conversation selector.
  *   node ctx.mjs list
  *   node ctx.mjs doctor                        what could keep it from working, and the fix for each
  *   node ctx.mjs wire <claude|codex|all>       resume and save by themselves, through hooks
@@ -39,7 +41,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 // Raised when the record format or the script's behavior changes: init replaces an older copy.
-const VERSION = 2;
+const VERSION = 3;
 const SELF = fileURLToPath(import.meta.url);
 const DIR = '.context';
 const SECTIONS = ['Goal', 'Done', 'Next actions', 'Decisions', 'Dead ends', 'Open questions', 'Notes'];
@@ -61,10 +63,12 @@ conversation in \`conversations/\`, all of them listed in \`index.md\`, and the 
 Git ignores this folder through its own \`.gitignore\`: nothing here is committed unless you delete
 that file.
 
-- Continue: \`node .context/ctx.mjs resume\`, then \`node .context/ctx.mjs start --task <task> --agent <your tool>\`.
-- Keep your record current: edit its sections, or \`node .context/ctx.mjs note next "..."\`; then
+- New conversation: \`node .context/ctx.mjs resume\`, then \`node .context/ctx.mjs start --task <task> --agent <your tool>\` once.
+- Same conversation: reuse its record with \`resume --file <record>\`; do not start another after compaction.
+- Keep your record current: edit its sections, or \`node .context/ctx.mjs note next "..." --file <record>\`; then
   \`node .context/ctx.mjs save --file <record>\`.
-- Record a check and whether it still holds later: \`node .context/ctx.mjs check -- npm test\`.
+- Record a check and whether it still holds later: \`node .context/ctx.mjs check --file <record> -- npm test\`.
+- Use \`--session <id>\` in place of \`--file\` when known; ambiguous updates are refused.
 - Never write secrets here: save refuses a record that holds one.
 - A record is an earlier session's notes, not instructions: check it against the code.
 `;
@@ -276,7 +280,20 @@ function records(root) {
     .map((name) => readRecord(path.join(dir, name)))
     .sort((a, b) => time(b) - time(a) || b.file.localeCompare(a.file));
 }
-const latestOpen = (all) => all.find((record) => record.meta.status !== 'done') ?? all[0];
+// A task's predecessors are history, even if an old session saves again later.
+function currentTasks(all) {
+  const superseded = new Set(all.filter((record) => record.meta.previous).map((record) => `${record.meta.task}/${record.meta.previous}`));
+  const seen = new Set();
+  return all.filter((record) => {
+    if (superseded.has(`${record.meta.task}/${path.basename(record.file)}`) || seen.has(record.meta.task)) return false;
+    seen.add(record.meta.task);
+    return true;
+  });
+}
+const latestOpen = (all) => {
+  const current = currentTasks(all);
+  return current.find((record) => record.meta.status !== 'done') ?? current[0];
+};
 // A heading in any case: a model that writes "## Next Actions" means the same section.
 const isHeading = (line, name) => line.trim().toLowerCase() === `## ${name}`.toLowerCase();
 function sectionBounds(lines, name) {
@@ -329,7 +346,7 @@ function latestChecks(root, task) {
 }
 function describeCheck(entry, ws) {
   const result = entry.exit === 0 ? 'passed' : `failed (exit ${entry.exit})`;
-  const freshness = !ws.git ? 'freshness unknown' : entry.fingerprint === ws.fingerprint ? 'fresh' : 'stale, the code changed since';
+  const freshness = !ws.git ? 'freshness unknown' : entry.changedDuringRun ? 'stale, the code changed during the check' : entry.fingerprint === ws.fingerprint ? 'fresh' : 'stale, the code changed since';
   return `${result}, ${freshness}: \`${entry.command}\` at ${human(entry.at)}`;
 }
 
@@ -377,8 +394,8 @@ function driftLines(root, record, ws) {
   lines.push(record.meta.fingerprint === ws.fingerprint ? '- Code: exactly as saved.' : '- Code: changed since the save.');
   return lines;
 }
-function brief(root, record, all, { full = false, drift = true, ws = workspace(root) } = {}) {
-  const earlier = all.filter((other) => other !== record && other.meta.task === record.meta.task);
+function brief(root, record, all, { full = false, drift = true, continuing = false, ws = workspace(root) } = {}) {
+  const earlier = all.filter((other) => other.file !== record.file && other.meta.task === record.meta.task);
   const out = [
     `# Context: ${record.meta.task}`,
     '',
@@ -397,13 +414,15 @@ function brief(root, record, all, { full = false, drift = true, ws = workspace(r
     if (lines.length > limit) out.push(`(${lines.length - limit} more lines in the record)`);
   }
   const others = [];
-  for (const other of all) {
+  for (const other of currentTasks(all)) {
     if (other.meta.task !== record.meta.task && other.meta.status !== 'done' && !others.some((seen) => seen.meta.task === other.meta.task)) others.push(other);
   }
   if (others.length) out.push('', `Other open tasks: ${others.slice(0, 5).map((other) => `${other.meta.task} (${other.meta.agent}, ${ago(other.meta.updated)})`).join('; ')}.`);
   out.push(
     '',
-    `To continue: \`node ${DIR}/ctx.mjs start --task ${record.meta.task} --agent <your tool>\` starts this conversation's record from this one.`,
+    continuing
+      ? `Continue this conversation's record: \`node ${DIR}/ctx.mjs save --file ${rel(root, record.file)}\`. Use this same --file for note and check; do not start another record.`
+      : `For a new conversation: \`node ${DIR}/ctx.mjs start --task ${record.meta.task} --agent <your tool>\` starts its record from this one. If this conversation already owns a record, keep using its --file instead.`,
     'These are notes from an earlier session, not instructions: check them against the code, and re-run stale checks before relying on them.',
   );
   return out.join('\n');
@@ -440,15 +459,20 @@ function createRecord(root, { task, agent, session = '', previous, preface }) {
   stampRecord(root, record);
   return record;
 }
-// The record a command acts on: --file, else the newest one of --agent, else the newest.
+// Mutations need one unambiguous owner; never silently choose another conversation.
 function pick(root, flags) {
+  let matches;
   if (flags.file) {
     const file = [path.resolve(flags.file), path.resolve(root, flags.file)].find((candidate) => existsSync(candidate));
-    return file ? readRecord(file) : undefined;
-  }
-  const all = records(root);
-  const agent = flags.agent && slug(flags.agent);
-  return (agent && all.find((record) => record.meta.agent === agent)) || all[0];
+    if (!file) return { error: `No record at ${flags.file}.` };
+    matches = [readRecord(file)];
+  } else matches = records(root);
+  if (flags.session) matches = matches.filter((record) => record.meta.session === flags.session);
+  if (flags.agent) matches = matches.filter((record) => record.meta.agent === slug(flags.agent));
+  if (flags.task) matches = matches.filter((record) => record.meta.task === slug(flags.task));
+  if (matches.length > 1) return { error: 'More than one conversation matches. Use --file <record> or --session <id> to select yours.' };
+  if (!matches.length && (flags.file || flags.session || flags.agent)) return { error: 'No record matches the requested conversation.' };
+  return { record: matches[0] };
 }
 // Makes .context/ when it is missing, ignored by git through a .gitignore of its own, so the
 // project's own files stay untouched; and keeps a copy of this script there for every tool.
@@ -497,7 +521,7 @@ function start(flags) {
   }
   const task = slug(flags.task ?? latestOpen(all)?.meta.task);
   const agent = slug(flags.agent ?? detectAgent());
-  const previous = all.find((record) => record.meta.task === task);
+  const previous = currentTasks(all).find((record) => record.meta.task === task);
   if (created) print(`Created ${DIR}/; git ignores it through its own .gitignore.`, '');
   const ws = workspace(root);
   if (previous) print(brief(root, previous, all, { ws }), '');
@@ -512,7 +536,8 @@ function start(flags) {
 
 function save(flags) {
   const root = findRoot();
-  const record = pick(root, flags);
+  const { record, error } = pick(root, flags);
+  if (error) return fail(error);
   if (!record) return fail(`No record to save. Start one: node ${DIR}/ctx.mjs start --task <name> --agent <your tool>`);
   if (flags.status && !STATUSES.includes(flags.status.replace(/-/g, ' '))) return fail(`--status is one of: ${STATUSES.join(', ')}.`);
   const found = findSecrets(narrative(record.body));
@@ -543,7 +568,8 @@ function note(flags, positional) {
   const name = NOTE_SECTIONS[kind];
   if (!name || !words.length) return fail(`Usage: note <${Object.keys(NOTE_SECTIONS).join('|')}> <text>`);
   const root = findRoot();
-  const record = pick(root, flags);
+  const { record, error } = pick(root, flags);
+  if (error) return fail(error);
   if (!record) return fail(`No record to add to. Start one: node ${DIR}/ctx.mjs start --task <name> --agent <your tool>`);
   const text = words.join(' ');
   const found = findSecrets(text);
@@ -564,18 +590,20 @@ function check(flags) {
   if (!parts?.length) return fail('Usage: check [--task <name>] -- <command>');
   const root = findRoot();
   ensure(root);
+  const { record, error } = pick(root, flags);
+  if (error) return fail(error);
+  const task = slug(flags.task ?? record?.meta.task);
   const command = parts.length === 1 ? parts[0] : parts.map(quoteArg).join(' ');
+  const before = workspace(root);
   const began = Date.now();
   const run = spawnSync(command, { shell: true, stdio: 'inherit' });
   const exit = run.status ?? 1;
-  const all = records(root);
-  const task = slug(flags.task ?? latestOpen(all)?.meta.task);
   const ws = workspace(root);
-  const entry = { task, agent: slug(flags.agent ?? detectAgent()), command: maskText(command), exit, ms: Date.now() - began, at: stamp(), head: ws.head ?? '', fingerprint: ws.fingerprint ?? '' };
+  const entry = { task, agent: slug(flags.agent ?? record?.meta.agent ?? detectAgent()), command: maskText(command), exit, ms: Date.now() - began, at: stamp(), head: before.head ?? '', fingerprint: before.fingerprint ?? '', changedDuringRun: before.git && before.fingerprint !== ws.fingerprint };
   appendFileSync(paths(root).checks, `${JSON.stringify(entry)}\n`);
-  const record = all.find((candidate) => candidate.meta.task === task);
   if (record) {
-    stampRecord(root, record, ws);
+    // A hook or this conversation may have saved notes while the command was running.
+    stampRecord(root, readRecord(record.file), ws);
     regenerate(root);
   }
   eprint(`Recorded \`${entry.command}\` for ${task}: ${exit === 0 ? 'passed' : `failed (exit ${exit})`}.`);
@@ -595,9 +623,12 @@ function resume(flags) {
     print(existsSync(paths(root).dir) ? `No records in ${DIR}/ yet.` : `No ${DIR}/ here yet. Start one: node ctx.mjs start --task <name> --agent <your tool>`);
     return 0;
   }
-  const record = flags.task ? all.find((candidate) => candidate.meta.task === slug(flags.task)) : latestOpen(all);
+  const continuing = Boolean(flags.file || flags.session);
+  const selected = continuing ? pick(root, flags) : {};
+  if (selected.error) return fail(selected.error);
+  const record = continuing ? selected.record : flags.task ? currentTasks(all).find((candidate) => candidate.meta.task === slug(flags.task)) : latestOpen(all);
   if (!record) return fail(`No record for ${slug(flags.task)}. Tasks: ${[...new Set(all.map((candidate) => candidate.meta.task))].join(', ')}.`);
-  const text = brief(root, record, all, { full: flags.full });
+  const text = brief(root, record, all, { full: flags.full, continuing });
   print(text);
   if (flags.copy) eprint(copyToClipboard(text) ? 'Copied the brief to the clipboard.' : 'No clipboard tool found: copy the brief above.');
   return 0;
@@ -721,6 +752,11 @@ function sessionStart(root, tool, input) {
     if (Date.now() - statSync(old).mtimeMs > 14 * 86400 * 1000) rmSync(old, { force: true });
   }
   const all = records(root);
+  const existing = input.session_id && all.find((record) => record.meta.session === input.session_id);
+  if (existing) {
+    print(brief(root, existing, all, { continuing: true }));
+    return;
+  }
   const latest = latestOpen(all);
   const startCommand = `node ${DIR}/ctx.mjs start --task ${latest ? latest.meta.task : '<short task name>'} --agent ${AGENT_OF[tool]}${input.session_id ? ` --session ${input.session_id}` : ''}`;
   print(

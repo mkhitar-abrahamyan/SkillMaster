@@ -90,7 +90,11 @@
     if (el.type === 'password') wasPassword.add(el);
     if (wasPassword.has(el) || el.type === 'hidden' || el.hasAttribute('data-tracker-mask')) return true;
     if (SENSITIVE_AUTOCOMPLETE.test(el.getAttribute('autocomplete') || '')) return true;
-    const names = [el.getAttribute('name'), el.id, el.getAttribute('aria-label'), el.getAttribute('placeholder')];
+    const labels = Array.from(el.labels || [], (label) => label.textContent);
+    const scope = el.getRootNode?.() || el.ownerDocument;
+    const labelledBy = (el.getAttribute('aria-labelledby') || '').split(/\s+/)
+      .filter(Boolean).map((id) => scope?.getElementById?.(id)?.textContent);
+    const names = [el.getAttribute('name'), el.id, el.getAttribute('aria-label'), el.getAttribute('placeholder'), ...labels, ...labelledBy];
     return SENSITIVE_WORDS.test(words(names.filter(Boolean).join(' ')));
   };
   // A masked value: the same mark whatever its length, so the overlay reveals nothing about it.

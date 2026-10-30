@@ -144,8 +144,8 @@ try {
     assert.ok(text.includes(carried), `${carried} is carried over:\n${text}`);
   }
   assert.ok(!text.includes('Parser in `src/csv.js`'), "what the last conversation did stays in that one's record");
-  assert.equal(run(repo, ['note', 'next', 'Write the docs']).status, 0);
-  assert.equal(run(repo, ['note', 'done', 'Fields with commas are quoted']).status, 0);
+  assert.equal(run(repo, ['note', 'next', 'Write the docs', '--file', second]).status, 0);
+  assert.equal(run(repo, ['note', 'done', 'Fields with commas are quoted', '--file', second]).status, 0);
   text = read(secondFile);
   assert.match(text, /## Next actions\n\n1\. Quote fields that hold commas\.\n- Write the docs\n/, `a note goes to the newest record:\n${text}`);
   assert.match(text, /## Done\n\n- Fields with commas are quoted\n/, `the placeholder gives way:\n${text}`);
@@ -346,13 +346,71 @@ try {
   assert.equal(out.status, 0, out.stderr);
   assert.match(read(path.join(plain, recordOf(out.stdout))), /Not a git repository/, 'a record says what it cannot know');
   // A finished task steps aside: resume shows the latest open one.
-  assert.equal(run(plain, ['start', '--task', 'later', '--agent', 'aider']).status, 0);
-  assert.equal(run(plain, ['save', '--status', 'done']).status, 0);
+  out = run(plain, ['start', '--task', 'later', '--agent', 'aider']);
+  assert.equal(out.status, 0);
+  assert.equal(run(plain, ['save', '--file', recordOf(out.stdout), '--status', 'done']).status, 0);
   mkdirSync(path.join(plain, 'notes'), { recursive: true });
   out = run(path.join(plain, 'notes'), ['resume']);
   assert.match(out.stdout, /^# Context: notes$/m, `resume, from a subfolder, skips the task marked done:\n${out.stdout}`);
   assert.match(out.stdout, /Not a git repository: what changed since cannot be told/, 'and says what it cannot know');
   console.log('ok - without git, records and briefs still work, and say what they cannot know; a finished task steps aside');
+
+  // A passing command cannot certify code that changed while it ran.
+  const moving = project('changed-during-check');
+  run(moving, ['start', '--task', 'freshness', '--agent', 'codex']);
+  const originalApp = read(path.join(moving, 'app.js'));
+  writeFileSync(path.join(moving, 'check.cjs'), [
+    "const fs = require('node:fs');",
+    "require('node:assert/strict').match(fs.readFileSync('app.js', 'utf8'), /a \\+ b/);",
+    "fs.writeFileSync('app.js', 'export const add = () => 999;\\n');",
+  ].join('\n'));
+  assert.equal(run(moving, ['check', '--', process.execPath, 'check.cjs']).status, 0);
+  assert.match(run(moving, ['resume']).stdout, /passed, stale, the code changed during the check/);
+  const entry = JSON.parse(read(path.join(moving, '.context', 'checks.jsonl')).trim());
+  assert.equal(entry.changedDuringRun, true);
+  writeFileSync(path.join(moving, 'app.js'), originalApp);
+  assert.match(run(moving, ['resume']).stdout, /stale, the code changed during the check/, 'returning to the old code does not validate an unstable run');
+  console.log('ok - checks fingerprint their starting code and flag changes during execution');
+
+  // Resuming one session must not select another session's newer record.
+  const concurrent = project('concurrent');
+  const a = recordOf(run(concurrent, ['start', '--task', 'task-a', '--agent', 'codex', '--session', 'session-a']).stdout);
+  const b = recordOf(run(concurrent, ['start', '--task', 'task-b', '--agent', 'codex', '--session', 'session-b']).stdout);
+  const bBefore = read(path.join(concurrent, b));
+  out = hook(concurrent, 'codex', 'SessionStart', 'session-a');
+  assert.match(out.stdout, /^# Context: task-a$/m);
+  assert.match(out.stdout, /do not start another record/);
+  assert.doesNotMatch(out.stdout, /ctx\.mjs start --task/);
+  assert.equal(run(concurrent, ['note', 'done', 'ambiguous']).status, 1);
+  assert.equal(run(concurrent, ['save', '--status', 'done']).status, 1);
+  writeFileSync(path.join(concurrent, 'marker.cjs'), `const fs = require('node:fs');\nfs.writeFileSync('ran.txt', 'ran');\nfs.appendFileSync(${JSON.stringify(a)}, '\\nNotes saved during the check.\\n');\n`);
+  assert.equal(run(concurrent, ['check', '--', process.execPath, 'marker.cjs']).status, 1);
+  assert.ok(!existsSync(path.join(concurrent, 'ran.txt')), 'ambiguous checks fail before executing');
+  assert.equal(run(concurrent, ['note', 'done', 'A-only note', '--session', 'session-a']).status, 0);
+  assert.equal(run(concurrent, ['check', '--session', 'session-a', '--', process.execPath, 'marker.cjs']).status, 0);
+  assert.equal(run(concurrent, ['save', '--file', a, '--status', 'ready-for-review']).status, 0);
+  assert.equal(read(path.join(concurrent, b)), bBefore, 'session B was not changed');
+  assert.match(read(path.join(concurrent, a)), /A-only note/);
+  assert.match(read(path.join(concurrent, a)), /Notes saved during the check\./, 'check preserves notes saved during execution');
+  out = run(concurrent, ['resume', '--session', 'session-a']);
+  assert.match(out.stdout, /^# Context: task-a$/m);
+  assert.doesNotMatch(out.stdout, /earlier for this task/, 'a record is not its own history');
+  assert.equal(run(concurrent, ['save', '--session', 'missing']).status, 1, 'an unknown session never falls back');
+  console.log('ok - session resumes, notes, saves, and checks retain their owner');
+
+  // Completion belongs to the current record, not an unfinished historical predecessor.
+  const finished = project('finished', { git: false });
+  const old = recordOf(run(finished, ['start', '--task', 'complete', '--agent', 'codex']).stdout);
+  const done = recordOf(run(finished, ['start', '--task', 'complete', '--agent', 'codex']).stdout);
+  assert.equal(run(finished, ['save', '--file', done, '--status', 'done']).status, 0);
+  assert.match(run(finished, ['resume']).stdout, new RegExp(`Record: ${pattern(done)}`));
+  assert.equal(run(finished, ['save', '--file', old]).status, 0, 'an older session can still save its own history');
+  assert.match(run(finished, ['resume', '--task', 'complete']).stdout, new RegExp(`Record: ${pattern(done)}`));
+  run(finished, ['start', '--task', 'open', '--agent', 'codex']);
+  out = run(finished, ['resume']);
+  assert.match(out.stdout, /^# Context: open$/m);
+  assert.doesNotMatch(out.stdout, /Other open tasks:.*complete/, 'history does not revive the completed task');
+  console.log('ok - completed successor records keep their predecessors out of open-task selection');
 } finally {
   rmSync(work, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 }

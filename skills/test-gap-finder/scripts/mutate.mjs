@@ -16,8 +16,9 @@
  *     ]
  *   }
  *
- * Each `from` must occur exactly once in its file. The test command must pass on the unmutated code
- * first. Every mutant is applied alone, the test run, and the file restored byte for byte, also when
+ * Each `from` must occur exactly once in its file. Every distinct test command, including mutant
+ * overrides, must pass on the unmutated code first. Every mutant is applied alone, the test run,
+ * and the file restored byte for byte, also when
  * the run is interrupted; the restore is verified at the end. Run it in an isolated copy (a git
  * worktree or a scratch copy), never in a working tree with someone's edits in progress: `--root`
  * points at that copy, and every mutated file must lie inside it.
@@ -29,7 +30,7 @@
  */
 import { spawn, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, realpathSync, statSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
 const args = process.argv.slice(2);
@@ -51,7 +52,26 @@ try {
 } catch (error) {
   fail(`${specPath} is not readable JSON: ${error.message}`);
 }
-const root = path.resolve(option('--root') ?? '.');
+const root = realpathSync(path.resolve(option('--root') ?? '.'));
+const outsideRoot = (file) => {
+  const relative = path.relative(root, file);
+  return relative === '..' || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative);
+};
+// Resolve links before writing: a junction inside the copy can point outside it.
+function mutationFile(mutant) {
+  const file = path.resolve(root, mutant.file);
+  if (outsideRoot(file)) fail(`"${mutant.name}" names a file outside ${root}`);
+  let resolved;
+  try {
+    resolved = realpathSync(file);
+  } catch (error) {
+    if (error.code === 'ENOENT') return file; // Report missing files with the other results.
+    fail(`Cannot resolve "${mutant.file}": ${error.message}`);
+  }
+  if (outsideRoot(resolved)) fail(`"${mutant.name}" resolves to a file outside ${root}`);
+  if (statSync(resolved).nlink > 1) fail(`"${mutant.name}" names a hard-linked file; use an independent copy`);
+  return resolved;
+}
 if (typeof spec.test !== 'string' || !Array.isArray(spec.mutants) || spec.mutants.length === 0) {
   fail('The mutants file needs a "test" command and a non-empty "mutants" list');
 }
@@ -61,10 +81,8 @@ for (const [index, mutant] of spec.mutants.entries()) {
     if (typeof mutant[key] !== 'string') fail(`mutants[${index}] needs a string "${key}"`);
   }
   if (mutant.from === mutant.to) fail(`mutants[${index}] ("${mutant.name}") changes nothing`);
-  const file = path.resolve(root, mutant.file);
-  if (path.relative(root, file).startsWith('..') || path.isAbsolute(path.relative(root, file))) {
-    fail(`mutants[${index}] ("${mutant.name}") names a file outside ${root}`);
-  }
+  if (mutant.test !== undefined && (typeof mutant.test !== 'string' || !mutant.test.trim())) fail(`mutants[${index}] needs a non-empty "test" command`);
+  mutationFile(mutant);
 }
 
 let current;
@@ -126,14 +144,18 @@ for (const signal of ['SIGINT', 'SIGTERM']) {
   });
 }
 
-const baseline = await run(spec.test);
-if (!baseline.passed) {
-  fail(`The baseline fails, so no mutant can be judged. \`${spec.test}\` ended with ${baseline.status}:\n${baseline.tail}`);
+let baseline;
+for (const command of new Set([spec.test, ...spec.mutants.map((mutant) => mutant.test ?? spec.test)])) {
+  const checked = await run(command);
+  if (!checked.passed) {
+    fail(`The baseline fails, so no mutant can be judged. \`${command}\` ended with ${checked.status}:\n${checked.tail}`);
+  }
+  if (command === spec.test) baseline = checked;
 }
 
 const results = [];
 for (const mutant of spec.mutants) {
-  const file = path.resolve(root, mutant.file);
+  const file = mutationFile(mutant);
   let bytes;
   try {
     bytes = readFileSync(file);

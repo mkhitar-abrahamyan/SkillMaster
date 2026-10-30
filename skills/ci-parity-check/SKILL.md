@@ -19,13 +19,21 @@ out, before a push finds out the hard way.
 
 ## Workflow
 
-1. **Read the matrix.** From the CI configuration: OS images, runtime versions, services and their
+1. **Resolve the target and read its matrix.** Record the requested commit/ref, or the current
+   implementation including its scoped staged, unstaged, and relevant untracked files. Use the CI
+   configuration from that target: OS images, runtime versions, services and their
    images, environment variables by name, and the exact commands in their order, including flags
    that make a skippable check mandatory there, such as one that requires a container daemon.
-2. **Export what CI checks out.** Make a clean copy of the commit, not the working tree:
-   `git -c core.autocrlf=false archive HEAD | tar -x -C <scratch>`, or a fresh worktree. Untracked
-   files stay out, and line endings match the repository rather than a Windows checkout; confirm on
-   one file (`od -c file | head -1` shows `\n`, not `\r\n`).
+2. **Copy the exact target into isolation.** For a committed target, resolve its SHA and export it
+   with `git archive --format=tar --output=<archive-path> <target-sha>`, then extract into an empty
+   scratch folder, or use a fresh worktree at that SHA. Writing an archive file avoids binary-pipe
+   corruption in older PowerShell versions. For an implementation with local changes, export its
+   base and apply the scoped changes, including additions, deletions, renames, and relevant
+   untracked source/configuration/test files. Include lockfile and CI configuration changes; omit
+   secrets, dependency caches, and generated build outputs. Never substitute a clean `HEAD` for
+   the requested local implementation. Verify the copy's content and file list against the target,
+   using CI's checkout attributes and line-ending rules, and record any exclusions. If the target
+   changes during copying or cannot be reproduced, refresh the copy or report `PARTIAL`.
 3. **Map each cell to a stand-in.** Linux through WSL, a VM, or a container of the CI's base image;
    each runtime version through side-by-side installs or a version manager; services through
    containers. Name every cell without a stand-in.
@@ -45,13 +53,14 @@ Start with **CI parity:** and the first matching result:
 
 - A check fails reproducibly in a cell where it passes locally -> `DIVERGES`.
 - A check fails only sometimes in a cell -> `FLAKY`, with its failure rate there.
-- A material cell had no stand-in or could not run -> `PARTIAL`.
+- The requested target was not reproduced, or a material cell had no stand-in or could not run -> `PARTIAL`.
 - Otherwise -> `PARITY`.
 
 Then include:
 
 - **Matrix:** each CI cell, its local stand-in, and its result.
-- **Export:** how the copy was made, and the line-ending check.
+- **Target and export:** resolved commit/base SHA, included local changes, how the copy was made,
+  content verification, exclusions, and the line-ending check.
 - **Divergences:** each with its first difference, the evidence, and the fix.
 - **Flakes:** each test with its failure rate per cell and the suspected source of nondeterminism.
 - **Not covered:** cells without a stand-in, and what would cover them.
