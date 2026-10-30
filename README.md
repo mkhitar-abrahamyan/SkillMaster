@@ -175,7 +175,7 @@ Copy-Item -Recurse SkillMaster\skills\bug-reproducer "$HOME\.claude\skills\"
 skills/<name>/SKILL.md      one folder per skill; name matches the folder
 skills/<name>/references/   reference files the skill links to (copies of shared files are synced)
 skills/<name>/scripts/      scripts the skill runs (copies of shared scripts are synced)
-references/                 canonical shared review references
+references/                 canonical shared references: repository rules, stack checks, registries
 scripts/                    canonical shared scripts, such as the mutation runner `mutate.mjs`
 scripts/blocks/             code embedded in self-contained scripts, such as the trackers' masking policy
 evals/<name>.json           trigger evals: prompts that should and should not activate each skill

@@ -33,8 +33,9 @@ publish only when the user says so.
    touches.
 2. **Preflight.** A clean working tree on the branch to release, level with its remote; CI green on
    the exact commit (`gh run list --commit <sha>`); the registry's current version and dist-tags
-   (`npm view <package> dist-tags`); the last release actually published; the next version chosen
-   under the project's versioning policy, a breaking change making it a major.
+   (`npm view <package> dist-tags`, or [Registries](references/registries.md) for other
+   ecosystems); the last release actually published; the next version chosen under the project's
+   versioning policy, a breaking change making it a major.
 3. **Version, everywhere.** Every place the version lives: manifests, lockfiles (each entry that
    names the package), sub-packages and the peer ranges between them, version constants in source,
    and docs that name the current release. Search for the old version string to find stragglers. On
@@ -53,9 +54,9 @@ publish only when the user says so.
 6. **Publish** (publish mode only). Commit the release, push the branch, and push the tag exactly
    as the pipeline expects it: its name format, annotated or not, on the commit just gated.
 7. **Watch to the end.** Follow every run the push started to completion (`gh run watch <id>`), then
-   confirm the registry lists the version under the expected dist-tag, for each package published. A
-   registry can take a long time to list a version after a successful publish: keep checking it
-   rather than publishing again.
+   confirm the registry lists the version under the expected dist-tag, for each package published,
+   with the commands in [Registries](references/registries.md). A registry can take a long time to
+   list a version after a successful publish: keep checking it rather than publishing again.
 8. **Hand over.** Record what the next release needs to know: follow-ups, a known flake and what to
    do if it hits the pipeline, and anything a later major must change.
 

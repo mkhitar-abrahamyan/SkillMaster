@@ -26,14 +26,13 @@ installed code, the package registry, or a command you ran.
    "compatible with Y"). Number them `C1…Cn`.
 2. **Dependencies.** For each added or changed dependency, confirm through registry metadata that
    the package exists and is the intended one: exact spelling, publisher and source repository,
-   publish age, and release history, since near-miss names are a supply-chain risk. Examples:
-   `npm view <pkg> versions repository.url time.created`, `pip index versions <pkg>`,
-   `go list -m -versions <module>`. Confirm the pinned version exists and that the manifest and
-   lockfile changed consistently. Check everything else the change pulls in by name the same way:
-   GitHub Actions in `uses:` (the action and its tag exist; a third-party action is pinned to a
-   commit SHA), container images and their tags, and tools or MCP servers run through `npx`, `uvx`,
-   or `pipx`. A new package that runs install scripts (`npm view <pkg> scripts`) gets a read of what
-   they run.
+   publish age, and release history, since near-miss names are a supply-chain risk. Check
+   everything else the change pulls in by name the same way: GitHub Actions in `uses:` (the action
+   and its tag exist; a third-party action is pinned to a commit SHA its own repository has),
+   container images and their tags, and tools or MCP servers run through `npx`, `uvx`, or `pipx`.
+   Confirm the pinned version or digest exists, that the manifest and lockfile changed
+   consistently, and what any install-time code runs. [Registries](references/registries.md) has
+   the read-only commands for each ecosystem and the signs of a near-miss name.
 3. **Imports and symbols.** Every import must resolve to a real module and export (default versus
    named, path, casing). Every called API, option, CLI flag, configuration key, environment
    variable, and URL must exist in the **installed** version, with matching arguments and return

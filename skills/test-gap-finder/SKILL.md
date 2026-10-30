@@ -26,7 +26,11 @@ each new test can fail.
 1. **Inventory behaviors.** For each changed function, endpoint, or component, list behaviors as
    `B1…Bn`: each branch outcome, error path, boundary (empty, null, minimum, maximum, duplicate),
    state transition, side effect (writes, events, outbound calls), and contract output (status
-   codes, shapes, messages). Skip trivial accessors and pure wiring.
+   codes, shapes, messages). Skip trivial accessors and pure wiring. Load the stack references that
+   apply: [TypeScript](references/typescript.md), [React](references/react.md), and
+   [Backend](references/backend.md) list what breaks there, and so the behaviors most often left
+   untested, such as another tenant refused, a retried request applied once, or a stale response
+   not overwriting a newer one.
 2. **Map behaviors to tests.** Find tests that reach each behavior by searching the test tree for
    callers, and run coverage scoped to the changed files when the project has a coverage tool.
    Give each behavior one status:
