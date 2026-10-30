@@ -61,8 +61,11 @@ const toggled = field({ type: 'password' });
 assert.equal(secret(toggled), true);
 toggled.type = 'text';
 assert.equal(secret(toggled), true, 'still masked after the toggle');
+// Text inside a masked editable region, such as a bold run in a rich editor, is the region's.
+const region = { tagName: 'DIV', isContentEditable: true, parentElement: { isContentEditable: false }, getAttribute: () => null, hasAttribute: (name) => name === 'data-tracker-mask' };
+assert.equal(secret({ tagName: 'B', isContentEditable: true, parentElement: region, getAttribute: () => null, hasAttribute: () => false }), true, 'text inside a masked editable region');
 assert.equal(MASK.length, 3);
-console.log(`ok - the sensitive-field policy: ${cases.length + 7} cases`);
+console.log(`ok - the sensitive-field policy: ${cases.length + 8} cases`);
 
 // ── Both overlays, in a browser ──────────────────────────────────────
 
@@ -82,10 +85,11 @@ function chrome() {
     .find((candidate) => existsSync(candidate));
 }
 
-const SECRETS = ['hunter2', '4242424242424242', '918273', 'sk-live-abc123'];
+const SECRETS = ['hunter2', '4242424242424242', '918273', 'sk-live-abc123', 'k3ep-s3cret'];
 const page = `<!doctype html><meta charset="utf-8">
 <input id="pw" type="password"><input id="card" autocomplete="cc-number"><input id="otp" autocomplete="one-time-code">
 <input id="key" name="apiKey"><input id="who" name="displayName">
+<div id="notes" contenteditable data-tracker-mask><b id="bold"></b></div>
 <pre id="out"></pre>
 <script>
 // An error in the page is reported, not lost.
@@ -112,6 +116,17 @@ type('card', '4242424242424242');
 type('otp', '918273');
 type('key', 'sk-live-abc123');
 type('who', 'Ana');
+// A masked editable region, typed into through the bold text inside it, then hovered there: the
+// element's description must not carry what was typed.
+const region = document.getElementById('notes');
+const bold = document.getElementById('bold');
+region.focus();
+for (const key of 'k3ep-s3cret') {
+  region.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true }));
+  bold.textContent += key;
+  region.dispatchEvent(new Event('input', { bubbles: true }));
+}
+bold.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, clientX: 5, clientY: 5 }));
 results.all = shown();
 // The whole log, past the eight lines shown, masked as shown.
 results.allExport = window.__actionTracker.export();
@@ -144,6 +159,7 @@ act('input', '#card', '4242424242424242');
 act('input', '#otp', '918273');
 act('input', '#key', 'sk-live-abc123');
 act('input', '#who', 'Ana');
+act('input', '#notes', 'k3ep-s3cret');
 act('key', 'Enter');
 results.agent = shown();
 // Click-through: the panel's body passes the pointer to the page; its grip and buttons take it.
@@ -248,6 +264,9 @@ for (const [overlay, text] of Object.entries({ all, agent, export: allExport }))
 }
 assert.ok(!/KEY/.test(allMaskedKeys), `no key line for a masked field:\n${allMaskedKeys}`);
 assert.ok(/INPUT[^"]*= "•••"/.test(allMaskedKeys), `only its masked value:\n${allMaskedKeys}`);
+// One line for the typing, uncounted: a line, or a count, per key would tell the length.
+assert.equal((allMaskedKeys.match(/INPUT/g) ?? []).length, 1, `one masked input line, not one per key:\n${allMaskedKeys}`);
+assert.ok(!allMaskedKeys.includes('×'), `a masked input line is not counted:\n${allMaskedKeys}`);
 assert.ok(!/KEY/.test(agentMaskedKeys), `no key the agent typed into the password:\n${agentMaskedKeys}`);
 console.log('ok - both overlays in a browser: nothing typed into a masked field is shown, and an ordinary field still is');
 

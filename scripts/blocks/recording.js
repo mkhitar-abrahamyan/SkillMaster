@@ -121,9 +121,12 @@
     }
     return `page.locator(${quote(`body > ${path.join(' > ')}`)})`;
   };
-  // The environment variable a masked field's value comes from in the test, named after its label.
-  const envName = (el) =>
-    `E2E_${(labelOf(el) || el.getAttribute('name') || el.id || 'secret').toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'SECRET'}`;
+  // The environment variable a masked field's value comes from in the test, named after its label,
+  // or its name or id when the label has no Latin letters or digits to make a name of, as "Пароль".
+  const envName = (el) => {
+    const word = (text) => String(text ?? '').toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+    return `E2E_${[labelOf(el), el.getAttribute('name'), el.id].map(word).find(Boolean) ?? 'SECRET'}`;
+  };
 
   const record = (action, el, data = {}) => {
     const step = { action, ...data };
@@ -131,13 +134,25 @@
       step.locator = locator(el);
       if (!step.locator) return;
     }
-    const last = steps[steps.length - 1];
+    const latest = steps[steps.length - 1];
+    // The last thing done, past the notes of what failed on the way, such as the request a search
+    // box sends for each key typed.
+    let at = steps.length - 1;
+    while (at >= 0 && steps[at].action === 'note') at--;
+    const last = steps[at];
     const sameTarget = last && last.locator === step.locator;
-    // Typing is one fill with the field's final value; a second click of a double click replaces the first.
-    if (sameTarget && ((action === 'fill' && last.action === 'fill') || (action === 'click' && data.count > 1 && last.action === 'click'))) {
-      steps[steps.length - 1] = step;
+    if (action === 'note' && latest?.action === 'note' && latest.text === step.text) {
+      // The same failure again, as from a page polling a broken endpoint: counted, not listed again.
+      latest.count = (latest.count ?? 1) + 1;
+    } else if (sameTarget && ((action === 'fill' && last.action === 'fill') || (action === 'click' && data.count > 1 && last.action === 'click'))) {
+      // Typing is one fill with the field's final value; a second click of a double click replaces the first.
+      steps[at] = step;
     } else steps.push(step);
-    if (steps.length > HISTORY) steps.shift();
+    // Over the limit the oldest steps go, but the test still starts at the address they had reached.
+    while (steps.length > HISTORY) {
+      const [dropped] = steps.splice(1, 1);
+      if (dropped.url !== undefined) steps[0] = { action: 'goto', url: dropped.url };
+    }
     save();
   };
   const KEYS = new Set(['Enter', 'Tab', 'Escape', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'PageUp', 'PageDown', 'Home', 'End']);
@@ -168,7 +183,7 @@
       else if (step.action === 'fill') body.push(`${target}.fill(${value(step)});${step.masked ? ' // masked while recording' : ''}`);
       else if (step.action === 'select') body.push(`${target}.selectOption(${value(step)});${step.masked ? ' // masked while recording' : ''}`);
       else if (step.action === 'press') body.push(step.locator ? `${target}.press(${quote(step.key)});` : `  await page.keyboard.press(${quote(step.key)});`);
-      else if (step.action === 'note') body.push(`  // ${step.text.replace(/\s+/g, ' ')}`);
+      else if (step.action === 'note') body.push(`  // ${step.text.replace(/\s+/g, ' ')}${step.count > 1 ? ` (×${step.count})` : ''}`);
     }
     const secrets = [...new Set(steps.filter((step) => step.masked).map((step) => step.env))];
     return [

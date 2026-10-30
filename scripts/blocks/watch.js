@@ -10,6 +10,10 @@
   const maskUrl = (raw, absolute = false) => {
     try {
       const url = new URL(raw, location.href);
+      if (url.username || url.password) {
+        url.username = MASK;
+        url.password = '';
+      }
       for (const name of [...url.searchParams.keys()]) {
         if (SENSITIVE_WORDS.test(words(name)) || SENSITIVE_PARAM.test(words(name))) url.searchParams.set(name, MASK);
       }
@@ -23,6 +27,7 @@
     String(text)
       .replace(/eyJ[\w-]+\.[\w-]+\.[\w-]+/g, MASK)
       .replace(/\b(bearer|basic)\s+[\w.~+/=-]+/gi, `$1 ${MASK}`)
+      .replace(/\/\/[^\s/?#@]+@/g, `//${MASK}@`)
       .replace(/([?&](?:[\w-]*(?:token|key|secret|password|auth|code|session|sig)[\w-]*)=)[^&\s"']+/gi, `$1${MASK}`)
       .slice(0, 200);
   const failed = (method, url, status) => {

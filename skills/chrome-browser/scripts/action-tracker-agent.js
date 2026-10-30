@@ -60,7 +60,8 @@
     const t = el.tagName.toLowerCase();
     const id = el.id ? '#' + el.id : '';
     const name = el.getAttribute('name') ? `[name=${el.getAttribute('name')}]` : '';
-    const label = (el.getAttribute('aria-label') || el.innerText || el.getAttribute('placeholder') || '')
+    // A field's text is what was typed into it: a masked one's is left out.
+    const label = (el.getAttribute('aria-label') || (secret(el) ? '' : el.innerText) || el.getAttribute('placeholder') || '')
       .replace(/\s+/g, ' ').trim().slice(0, 40);
     return `${t}${id}${name}${label ? ' "' + label + '"' : ''}`;
   };
@@ -84,6 +85,8 @@
     if (!el || !el.getAttribute) return false;
     const field = el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable;
     if (!field) return false;
+    // Inside an editable region, the region is the field, and its attributes say whether to mask.
+    while (el.isContentEditable && el.parentElement?.isContentEditable) el = el.parentElement;
     if (el.type === 'password') wasPassword.add(el);
     if (wasPassword.has(el) || el.type === 'hidden' || el.hasAttribute('data-tracker-mask')) return true;
     if (SENSITIVE_AUTOCOMPLETE.test(el.getAttribute('autocomplete') || '')) return true;
@@ -219,9 +222,12 @@
     }
     return `page.locator(${quote(`body > ${path.join(' > ')}`)})`;
   };
-  // The environment variable a masked field's value comes from in the test, named after its label.
-  const envName = (el) =>
-    `E2E_${(labelOf(el) || el.getAttribute('name') || el.id || 'secret').toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'SECRET'}`;
+  // The environment variable a masked field's value comes from in the test, named after its label,
+  // or its name or id when the label has no Latin letters or digits to make a name of, as "Пароль".
+  const envName = (el) => {
+    const word = (text) => String(text ?? '').toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+    return `E2E_${[labelOf(el), el.getAttribute('name'), el.id].map(word).find(Boolean) ?? 'SECRET'}`;
+  };
 
   const record = (action, el, data = {}) => {
     const step = { action, ...data };
@@ -229,13 +235,25 @@
       step.locator = locator(el);
       if (!step.locator) return;
     }
-    const last = steps[steps.length - 1];
+    const latest = steps[steps.length - 1];
+    // The last thing done, past the notes of what failed on the way, such as the request a search
+    // box sends for each key typed.
+    let at = steps.length - 1;
+    while (at >= 0 && steps[at].action === 'note') at--;
+    const last = steps[at];
     const sameTarget = last && last.locator === step.locator;
-    // Typing is one fill with the field's final value; a second click of a double click replaces the first.
-    if (sameTarget && ((action === 'fill' && last.action === 'fill') || (action === 'click' && data.count > 1 && last.action === 'click'))) {
-      steps[steps.length - 1] = step;
+    if (action === 'note' && latest?.action === 'note' && latest.text === step.text) {
+      // The same failure again, as from a page polling a broken endpoint: counted, not listed again.
+      latest.count = (latest.count ?? 1) + 1;
+    } else if (sameTarget && ((action === 'fill' && last.action === 'fill') || (action === 'click' && data.count > 1 && last.action === 'click'))) {
+      // Typing is one fill with the field's final value; a second click of a double click replaces the first.
+      steps[at] = step;
     } else steps.push(step);
-    if (steps.length > HISTORY) steps.shift();
+    // Over the limit the oldest steps go, but the test still starts at the address they had reached.
+    while (steps.length > HISTORY) {
+      const [dropped] = steps.splice(1, 1);
+      if (dropped.url !== undefined) steps[0] = { action: 'goto', url: dropped.url };
+    }
     save();
   };
   const KEYS = new Set(['Enter', 'Tab', 'Escape', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'PageUp', 'PageDown', 'Home', 'End']);
@@ -266,7 +284,7 @@
       else if (step.action === 'fill') body.push(`${target}.fill(${value(step)});${step.masked ? ' // masked while recording' : ''}`);
       else if (step.action === 'select') body.push(`${target}.selectOption(${value(step)});${step.masked ? ' // masked while recording' : ''}`);
       else if (step.action === 'press') body.push(step.locator ? `${target}.press(${quote(step.key)});` : `  await page.keyboard.press(${quote(step.key)});`);
-      else if (step.action === 'note') body.push(`  // ${step.text.replace(/\s+/g, ' ')}`);
+      else if (step.action === 'note') body.push(`  // ${step.text.replace(/\s+/g, ' ')}${step.count > 1 ? ` (×${step.count})` : ''}`);
     }
     const secrets = [...new Set(steps.filter((step) => step.masked).map((step) => step.env))];
     return [
@@ -309,20 +327,29 @@
   heading.querySelector('.title').textContent = title;
 
   const escape = (text) => text.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c]);
+  const lineText = (l) => `${l.text}${l.count > 1 ? ` (×${l.count})` : ''}`;
   const render = () => {
     const shown = lines.slice(-MAX_LOG);
     log.innerHTML = shown
-      .map((l, i) => `<div class="row ${l.kind}${i < shown.length - 1 ? ' old' : ''}">${l.at} <b>${l.kind.toUpperCase()}</b> ${escape(l.text)}</div>`)
+      .map((l, i) => `<div class="row ${l.kind}${i < shown.length - 1 ? ' old' : ''}">${l.at} <b>${l.kind.toUpperCase()}</b> ${escape(lineText(l))}</div>`)
       .join('');
   };
-  const add = (kind, text) => {
-    lines.push({ kind, text, at: clock() });
-    if (lines.length > HISTORY) lines.shift();
+  // A line repeated at once, as from a page polling a broken endpoint, is counted. A masked field's
+  // line is not (quiet): how many there were would tell the length of what was typed.
+  const add = (kind, text, quiet = false) => {
+    const last = lines[lines.length - 1];
+    if (last && last.kind === kind && last.text === text) {
+      if (!quiet) last.count = (last.count ?? 1) + 1;
+      last.at = clock();
+    } else {
+      lines.push({ kind, text, at: clock() });
+      if (lines.length > HISTORY) lines.shift();
+    }
     render();
     save();
   };
   // The whole log as text, values already masked as the panel shows them.
-  const exportLog = () => lines.map((l) => `${l.at} ${l.kind.toUpperCase()} ${l.text}`).join('\n');
+  const exportLog = () => lines.map((l) => `${l.at} ${l.kind.toUpperCase()} ${lineText(l)}`).join('\n');
   const copyText = async (text, button) => {
     try {
       await navigator.clipboard.writeText(text);
@@ -416,6 +443,10 @@
   const maskUrl = (raw, absolute = false) => {
     try {
       const url = new URL(raw, location.href);
+      if (url.username || url.password) {
+        url.username = MASK;
+        url.password = '';
+      }
       for (const name of [...url.searchParams.keys()]) {
         if (SENSITIVE_WORDS.test(words(name)) || SENSITIVE_PARAM.test(words(name))) url.searchParams.set(name, MASK);
       }
@@ -429,6 +460,7 @@
     String(text)
       .replace(/eyJ[\w-]+\.[\w-]+\.[\w-]+/g, MASK)
       .replace(/\b(bearer|basic)\s+[\w.~+/=-]+/gi, `$1 ${MASK}`)
+      .replace(/\/\/[^\s/?#@]+@/g, `//${MASK}@`)
       .replace(/([?&](?:[\w-]*(?:token|key|secret|password|auth|code|session|sig)[\w-]*)=)[^&\s"']+/gi, `$1${MASK}`)
       .slice(0, 200);
   const failed = (method, url, status) => {
@@ -598,7 +630,7 @@
     else if (kind === 'input') {
       const masked = secret(el);
       const v = masked ? MASK : String(detail ?? '').slice(0, 40);
-      box(el, 'focus', 'input ' + describe(el)); add('input', `${describe(el)} = "${v}"`);
+      box(el, 'focus', 'input ' + describe(el)); add('input', `${describe(el)} = "${v}"`, masked);
       record(el.tagName === 'SELECT' ? 'select' : 'fill', el, masked ? { masked: true, env: envName(el) } : { value: String(detail ?? '') });
     }
     return 'ok';

@@ -17,6 +17,8 @@
     if (!el || !el.getAttribute) return false;
     const field = el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable;
     if (!field) return false;
+    // Inside an editable region, the region is the field, and its attributes say whether to mask.
+    while (el.isContentEditable && el.parentElement?.isContentEditable) el = el.parentElement;
     if (el.type === 'password') wasPassword.add(el);
     if (wasPassword.has(el) || el.type === 'hidden' || el.hasAttribute('data-tracker-mask')) return true;
     if (SENSITIVE_AUTOCOMPLETE.test(el.getAttribute('autocomplete') || '')) return true;

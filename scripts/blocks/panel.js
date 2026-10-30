@@ -25,20 +25,29 @@
   heading.querySelector('.title').textContent = title;
 
   const escape = (text) => text.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c]);
+  const lineText = (l) => `${l.text}${l.count > 1 ? ` (×${l.count})` : ''}`;
   const render = () => {
     const shown = lines.slice(-MAX_LOG);
     log.innerHTML = shown
-      .map((l, i) => `<div class="row ${l.kind}${i < shown.length - 1 ? ' old' : ''}">${l.at} <b>${l.kind.toUpperCase()}</b> ${escape(l.text)}</div>`)
+      .map((l, i) => `<div class="row ${l.kind}${i < shown.length - 1 ? ' old' : ''}">${l.at} <b>${l.kind.toUpperCase()}</b> ${escape(lineText(l))}</div>`)
       .join('');
   };
-  const add = (kind, text) => {
-    lines.push({ kind, text, at: clock() });
-    if (lines.length > HISTORY) lines.shift();
+  // A line repeated at once, as from a page polling a broken endpoint, is counted. A masked field's
+  // line is not (quiet): how many there were would tell the length of what was typed.
+  const add = (kind, text, quiet = false) => {
+    const last = lines[lines.length - 1];
+    if (last && last.kind === kind && last.text === text) {
+      if (!quiet) last.count = (last.count ?? 1) + 1;
+      last.at = clock();
+    } else {
+      lines.push({ kind, text, at: clock() });
+      if (lines.length > HISTORY) lines.shift();
+    }
     render();
     save();
   };
   // The whole log as text, values already masked as the panel shows them.
-  const exportLog = () => lines.map((l) => `${l.at} ${l.kind.toUpperCase()} ${l.text}`).join('\n');
+  const exportLog = () => lines.map((l) => `${l.at} ${l.kind.toUpperCase()} ${lineText(l)}`).join('\n');
   const copyText = async (text, button) => {
     try {
       await navigator.clipboard.writeText(text);

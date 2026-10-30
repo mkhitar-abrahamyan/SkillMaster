@@ -24,7 +24,7 @@ const read = (file) => readFileSync(path.join(root, file), 'utf8');
 const ALL = read('skills/action-tracker/scripts/action-tracker-all.js').trim();
 const AGENT = read('skills/chrome-browser/scripts/action-tracker-agent.js').trim();
 // Typed into a masked field, or carried in a request, a console error, or a link: never recorded.
-const SECRETS = ['hunter2', 's3cret-query', 'oauth-c0de', 's3cret-bearer', 's3ss10n', 'abc123', 'eyJhbGciOi'];
+const SECRETS = ['hunter2', 's3cret-query', 'oauth-c0de', 's3cret-bearer', 's3ss10n', 'abc123', 'eyJhbGciOi', 'p4ss', 't0k3n'];
 
 function chrome() {
   return [
@@ -55,6 +55,8 @@ const form = `<!doctype html><meta charset="utf-8"><title>Form</title>
 <label for="email">Email</label> <input id="email" type="email">
 <label>Password <input id="pw" type="password"></label>
 <select aria-label="Plan"><option value="free">Free</option><option value="pro">Pro</option></select>
+<label for="pw-ru">Пароль</label> <input id="pw-ru" name="backup_password" type="password">
+<input id="suggest" placeholder="Search docs"> <button id="poll">Poll</button> <button id="creds">Retry</button>
 <button id="menu"><span id="inner">Open menu</span></button>
 <div id="tile"></div>
 <label><input type="checkbox"> Remember me</label>
@@ -84,6 +86,14 @@ on('boom', () => {
   setTimeout(() => { throw new Error('thrown later'); }, 50);
 });
 on('go', () => history.pushState({}, '', '/settings?tab=profile'));
+// A search box that asks a broken endpoint on every key, a poll that fails the same way three
+// times, and credentials in an address.
+document.getElementById('suggest').addEventListener('input', (e) => fetch('/api/suggest?q=' + e.target.value));
+on('poll', () => { for (let i = 0; i < 3; i++) console.error('poll failed'); });
+on('creds', () => {
+  fetch('http://admin:p4ss@localhost:9/x').catch(() => {});
+  console.error('retrying https://deploy:t0k3n@ci.example/x');
+});
 on('next', () => console.error('leaving'));
 </script>`;
 const next = `<!doctype html><meta charset="utf-8"><title>Next</title><button id="done">Done</button>`;
@@ -241,10 +251,18 @@ try {
   await click('li:nth-of-type(2) button');
   // Each failure waited for, so it is recorded after the click that caused it and before the next.
   const logged = (pattern) => until(String(pattern), async () => pattern.test(await evaluate('window.__actionTracker.export()')));
+  await click('#suggest');
+  for (const typed of ['a', 'ab', 'abc']) {
+    await type(typed.at(-1));
+    await logged(new RegExp(`q=${typed} → 404`));
+  }
+  await click('#poll');
+  await click('#creds');
+  await logged(/localhost:9\/x → network error/);
   await click('#fail');
-  await logged(/→ 500/);
+  await logged(/api\/fail.* → 500/);
   await click('#xhr');
-  await logged(/→ 404/);
+  await logged(/api\/missing → 404/);
   await click('#cancel');
   await click('#boom');
   await logged(/thrown later/);
@@ -296,6 +314,7 @@ try {
     note('Step: sign in');
     act('input', '#email', 'bo@example.com');
     act('input', '#pw', 'hunter2');
+    act('input', '#pw-ru', 'hunter2'); // a label in Cyrillic: the variable is named for the field's name
     act('input', 'select', 'pro');
     act('key', 'Escape'); // to the page itself: nothing has focus
     act('click', '#menu');
@@ -338,6 +357,9 @@ try {
   results.earlyTest = await evaluate('window.__actionTracker.test()');
   await evaluate('window.__actionTracker.clear()');
   results.cleared = await evaluate('window.__actionTracker.test()');
+  // Over the limit of 500 steps, the oldest go, but the test still starts at its address.
+  await evaluate(`(() => { for (let i = 0; i < 600; i++) window.__actionTracker.note('n' + i); })()`);
+  results.trimmed = await evaluate('window.__actionTracker.test()');
   await evaluate('window.__actionTracker.off()');
   await cdp('Page.removeScriptToEvaluateOnNewDocument', { identifier });
 } finally {
@@ -372,6 +394,19 @@ const expected = [
   `await page.locator('div:nth-of-type(3) > span').click();`,
   // The same test id, role, and name on every row: only a path finds the second.
   `await page.locator('li:nth-of-type(2) > button').click();`,
+  // Typing is one fill, though a failed request came between each key.
+  `await page.getByPlaceholder('Search docs').click();`,
+  `await page.getByPlaceholder('Search docs').fill('abc');`,
+  `// request failed: GET /api/suggest?q=a → 404`,
+  `// request failed: GET /api/suggest?q=ab → 404`,
+  `// request failed: GET /api/suggest?q=abc → 404`,
+  // The same failure three times running is one counted comment.
+  `await page.getByRole('button', { name: 'Poll' }).click();`,
+  `// page error: poll failed (×3)`,
+  // Credentials in an address are masked, in an error's text and in a request's URL.
+  `await page.getByRole('button', { name: 'Retry' }).click();`,
+  `// page error: retrying https://•••@ci.example/x`,
+  `// request failed: GET http://•••@localhost:9/x → network error`,
   `await page.getByRole('button', { name: 'Load', exact: true }).click();`,
   `// request failed: GET /api/fail?token=•••&code=••• → 500`,
   `await page.getByRole('button', { name: 'Old load' }).click();`,
@@ -414,6 +449,8 @@ assert.match(results.log, /NET GET \/api\/fail\?token=•••&code=••• �
 assert.match(results.log, /NET GET \/api\/missing → 404/, 'a failed XHR is in the log');
 assert.doesNotMatch(results.log, /aborted/, 'a request the page cancelled is not a failure');
 assert.match(results.log, /ERROR unhandled rejection: boom/, 'an unhandled rejection is in the log');
+assert.ok(results.log.includes('ERROR poll failed (×3)\n'), `a line repeated at once is counted:\n${results.log}`);
+assert.ok(results.log.includes('INPUT div "Bio" = "hello"'), `an editable region's text is in its input line:\n${results.log}`);
 assert.match(results.log, /NAV \/settings\?tab=profile/, 'an in-app route change is in the log');
 assert.match(results.log, /NAV page loaded: \/next\?token=•••&page=2/, 'the next page, its token masked');
 console.log('ok - failed requests, console errors, uncaught errors, and route changes are in the timeline, masked');
@@ -438,6 +475,7 @@ assert.deepEqual(
     '// Step: sign in',
     `await page.getByLabel('Email').fill('bo@example.com');`,
     `await page.getByLabel('Password').fill(process.env.E2E_PASSWORD ?? ''); // masked while recording`,
+    `await page.getByLabel('Пароль').fill(process.env.E2E_BACKUP_PASSWORD ?? ''); // masked while recording`,
     `await page.getByLabel('Plan').selectOption('pro');`,
     `await page.keyboard.press('Escape');`,
     `await page.getByRole('button', { name: 'Open menu' }).click();`,
@@ -466,4 +504,9 @@ assert.deepEqual(
   [`await page.goto('${base}/early');`],
   `clear() starts a fresh test from this page:\n${results.cleared}`,
 );
-console.log("ok - as a new-document script it is on before the page's own scripts, on every load; clear() starts afresh");
+const trimmed = lines(results.trimmed);
+const trimmedBody = trimmed.slice(trimmed.findIndex((line) => line.startsWith('test(')) + 1, trimmed.lastIndexOf('});'));
+assert.equal(trimmedBody.length, 500, 'at most 500 steps are kept');
+assert.equal(trimmedBody[0], `await page.goto('${base}/early');`, `over the limit, the test still starts at its address:\n${trimmedBody.slice(0, 3).join('\n')}`);
+assert.deepEqual([trimmedBody[1], trimmedBody.at(-1)], ['// n101', '// n599'], 'the oldest steps went, the newest stayed');
+console.log("ok - as a new-document script it is on before the page's own scripts, on every load; clear() starts afresh; a long recording keeps its start");
