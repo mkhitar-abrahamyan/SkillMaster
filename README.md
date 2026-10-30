@@ -152,6 +152,8 @@ Copy-Item -Recurse SkillMaster\skills\bug-reproducer "$HOME\.claude\skills\"
   what the page shows and act as you. They stay within the requested scope, do not read cookies or
   stored credentials, and remove their overlays when done. Enable remote debugging only while you
   need it, ideally in a profile without unrelated signed-in sessions.
+- The tracker overlays are click-through except their panel's grip and buttons, which move it, fold
+  it, and copy its log; the panel moves off an element before the agent acts on it.
 - Both tracker overlays mask what is typed into sensitive fields, because the overlay appears in
   screenshots: passwords, payment fields, one-time codes, API keys and tokens, PINs, and bank and
   government IDs show as `•••` whatever their length, and their keystrokes are not logged. A field

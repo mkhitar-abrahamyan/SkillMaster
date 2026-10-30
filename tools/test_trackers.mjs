@@ -10,10 +10,10 @@
  */
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const root = path.resolve(fileURLToPath(new URL('..', import.meta.url)));
 const read = (file) => readFileSync(path.join(root, file), 'utf8');
@@ -86,6 +86,8 @@ const page = `<!doctype html><meta charset="utf-8">
 <input id="key" name="apiKey"><input id="who" name="displayName">
 <pre id="out"></pre>
 <script>
+// An error in the page is reported, not lost.
+window.addEventListener('error', (e) => { document.getElementById('out').textContent = 'ERROR ' + e.message + ' at line ' + e.lineno; });
 // Read what the overlay displays: its shadow root is closed, so open it for the test only.
 const attach = Element.prototype.attachShadow;
 Element.prototype.attachShadow = function (options) { return attach.call(this, { ...options, mode: 'open' }); };
@@ -109,10 +111,20 @@ type('otp', '918273');
 type('key', 'sk-live-abc123');
 type('who', 'Ana');
 results.all = shown();
+// The whole log, past the eight lines shown, masked as shown.
+results.allExport = window.__actionTracker.export();
 // Not one key line for a masked field: even a mark per key would tell its length.
 window.__actionTracker.clear();
 type('card', '42');
 results.allMaskedKeys = shown();
+// The panel's own buttons are not page actions.
+const panelRoot = () => document.getElementById('__action-tracker-host').shadowRoot;
+const logged = () => window.__actionTracker.export().split('\\n').length;
+const linesBefore = logged();
+const copyButton = panelRoot().getElementById('copy');
+copyButton.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, composed: true }));
+copyButton.dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true }));
+results.panelClickLogged = logged() !== linesBefore;
 window.__actionTracker.off();
 delete window.__actionTracker;
 // A fresh page's password field, for the agent's tracker.
@@ -132,6 +144,53 @@ act('input', '#key', 'sk-live-abc123');
 act('input', '#who', 'Ana');
 act('key', 'Enter');
 results.agent = shown();
+// Click-through: the panel's body passes the pointer to the page; its grip and buttons take it.
+const rect = (el) => el.getBoundingClientRect();
+const centre = (r) => [r.left + r.width / 2, r.top + r.height / 2];
+const hostRoot = panelRoot();
+const panelEl = hostRoot.getElementById('panel');
+const logEl = hostRoot.getElementById('log');
+const under = document.createElement('button');
+under.id = 'under';
+under.textContent = 'under the panel';
+Object.assign(under.style, { position: 'fixed', left: rect(logEl).left + 'px', top: rect(logEl).top + 'px', width: '120px', height: '30px' });
+document.body.appendChild(under);
+results.clickThrough = document.elementFromPoint(...centre(rect(under)))?.id;
+results.buttonTakesPointer = document.elementFromPoint(...centre(rect(hostRoot.getElementById('copy')))) === document.getElementById('__action-tracker-host');
+// The agent acting on it moves the panel out of the way first.
+act('click', '#under');
+const after = rect(panelEl);
+const target = rect(under);
+results.dodged = !(target.left < after.right && target.right > after.left && target.top < after.bottom && target.bottom > after.top);
+// Dragged by its grip.
+const grip = hostRoot.getElementById('grip');
+const before = rect(panelEl);
+const g = rect(grip);
+grip.dispatchEvent(new PointerEvent('pointerdown', { clientX: g.left + 2, clientY: g.top + 2, pointerId: 1, bubbles: true }));
+grip.dispatchEvent(new PointerEvent('pointermove', { clientX: 102, clientY: 52, pointerId: 1, bubbles: true }));
+grip.dispatchEvent(new PointerEvent('pointerup', { clientX: 102, clientY: 52, pointerId: 1, bubbles: true }));
+results.dragged = [Math.round(rect(panelEl).left), Math.round(rect(panelEl).top)];
+results.expectedDrag = [Math.round(102 - (g.left + 2 - before.left)), Math.round(52 - (g.top + 2 - before.top))];
+// Collapsed, then expanded.
+hostRoot.getElementById('fold').click();
+results.collapsed = getComputedStyle(logEl).display;
+hostRoot.getElementById('fold').click();
+results.expanded = getComputedStyle(logEl).display;
+// A full-height sidebar under the panel: only moving across clears it.
+const sidebar = document.createElement('nav');
+sidebar.id = 'sidebar';
+Object.assign(sidebar.style, { position: 'fixed', right: '0px', top: '0px', width: '80px', height: '100vh', background: '#eee' });
+document.body.appendChild(sidebar);
+const grab = rect(grip);
+grip.dispatchEvent(new PointerEvent('pointerdown', { clientX: grab.left + 2, clientY: grab.top + 2, pointerId: 1, bubbles: true }));
+grip.dispatchEvent(new PointerEvent('pointermove', { clientX: innerWidth - 4, clientY: grab.top + 2, pointerId: 1, bubbles: true }));
+grip.dispatchEvent(new PointerEvent('pointerup', { clientX: innerWidth - 4, clientY: grab.top + 2, pointerId: 1, bubbles: true }));
+const side = rect(sidebar);
+const overlapsSidebar = () => { const p = rect(panelEl); return side.left < p.right && side.right > p.left && side.top < p.bottom && side.bottom > p.top; };
+results.sidebarCoveredBefore = overlapsSidebar();
+act('click', '#sidebar');
+results.sidebarCleared = !overlapsSidebar() && !panelEl.classList.contains('collapsed');
+results.agentExport = window.__actionTracker.export();
 window.__actionTracker.off();
 document.getElementById('out').textContent = 'RESULT ' + JSON.stringify(results);
 </script>`;
@@ -147,6 +206,9 @@ if (!browser) {
   process.exit(0);
 }
 const profile = mkdtempSync(path.join(tmpdir(), 'skillmaster-trackers-'));
+// A file, not a data: URL: both overlays together are longer than a Windows command line allows.
+const pageFile = path.join(profile, 'page.html');
+writeFileSync(pageFile, page);
 let dom = '';
 try {
   const child = spawn(
@@ -159,7 +221,7 @@ try {
       `--user-data-dir=${profile}`,
       '--virtual-time-budget=5000',
       '--dump-dom',
-      `data:text/html;base64,${Buffer.from(page).toString('base64')}`,
+      pathToFileURL(pageFile).href,
     ],
     { stdio: ['ignore', 'pipe', 'ignore'] },
   );
@@ -175,8 +237,8 @@ try {
 const reported = /<pre id="out">RESULT ([\s\S]*?)<\/pre>/.exec(dom)?.[1];
 assert.ok(reported, `the page reported what the overlays showed:\n${dom.slice(0, 1_500)}`);
 const results = JSON.parse(reported.replaceAll('&quot;', '"').replaceAll('&amp;', '&').replaceAll('&lt;', '<').replaceAll('&gt;', '>'));
-const { allMaskedKeys, agentMaskedKeys, ...overlays } = results;
-for (const [overlay, text] of Object.entries(overlays)) {
+const { allMaskedKeys, agentMaskedKeys, all, agent, allExport } = results;
+for (const [overlay, text] of Object.entries({ all, agent, export: allExport })) {
   assert.ok(text.length > 0, `the ${overlay} overlay shows its log`);
   for (const value of SECRETS) assert.ok(!text.includes(value), `the ${overlay} overlay shows ${value}:\n${text}`);
   assert.ok(text.includes(MASK), `the ${overlay} overlay marks what it masked`);
@@ -186,3 +248,21 @@ assert.ok(!/KEY/.test(allMaskedKeys), `no key line for a masked field:\n${allMas
 assert.ok(/INPUT[^"]*= "•••"/.test(allMaskedKeys), `only its masked value:\n${allMaskedKeys}`);
 assert.ok(!/KEY/.test(agentMaskedKeys), `no key the agent typed into the password:\n${agentMaskedKeys}`);
 console.log('ok - both overlays in a browser: nothing typed into a masked field is shown, and an ordinary field still is');
+
+// ── The panel: copied whole, moved, folded, and out of the way ─────────
+assert.ok(allExport.split('\n').length > 8, `the whole log is exported, past the eight lines shown: ${allExport.split('\n').length}`);
+assert.equal(results.panelClickLogged, false, 'a click on the panel is not logged as a page action');
+assert.equal(results.clickThrough, 'under', 'the panel body lets a click through to the page beneath');
+assert.equal(results.buttonTakesPointer, true, 'its buttons take the pointer');
+assert.equal(results.dodged, true, 'the panel moves out of the way of an element the agent acts on');
+assert.match(results.agentExport, /CLICK button#under/, 'and the action is logged');
+for (const [axis, value] of results.dragged.entries()) {
+  assert.ok(Math.abs(value - results.expectedDrag[axis]) <= 1, `dragged to ${results.dragged}, expected ${results.expectedDrag}`);
+}
+assert.deepEqual([results.collapsed, results.expanded], ['none', 'block'], 'folded and unfolded');
+assert.deepEqual(
+  [results.sidebarCoveredBefore, results.sidebarCleared],
+  [true, true],
+  'a full-height sidebar under the panel is cleared by moving across, the panel still open',
+);
+console.log('ok - the panel: exported whole, its own clicks not logged, click-through, dodging, dragging, and folding');
