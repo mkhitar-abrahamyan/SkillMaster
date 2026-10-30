@@ -1,0 +1,42 @@
+[
+  {
+    "query": "Implement this Figma screen in our Next.js app and check it on localhost: https://www.figma.com/design/AbCdEfGhIjKlMnOpQrStUv/Checkout?node-id=12-345",
+    "should_trigger": true
+  },
+  {
+    "query": "Build the pricing card component from this Figma frame using our design tokens, then verify it matches in the browser",
+    "should_trigger": true
+  },
+  {
+    "query": "The settings page doesn't match the Figma design anymore. Make it match and prove it with measurements.",
+    "should_trigger": true
+  },
+  {
+    "query": "Turn this Figma selection into a React component with all its hover and disabled states, and check each state in my running dev server",
+    "should_trigger": true
+  },
+  {
+    "query": "Here's the mobile and desktop frames in Figma for the new header. Implement both breakpoints and verify them on localhost:3000",
+    "should_trigger": true
+  },
+  {
+    "query": "Push our Button component from code into Figma as a design",
+    "should_trigger": false
+  },
+  {
+    "query": "Check why the sidebar overlaps the header on the staging page I have open in Chrome",
+    "should_trigger": false
+  },
+  {
+    "query": "Write Playwright visual regression tests for the login page",
+    "should_trigger": false
+  },
+  {
+    "query": "Generate a FigJam diagram of our checkout flow",
+    "should_trigger": false
+  },
+  {
+    "query": "Review my diff that restyles the navbar",
+    "should_trigger": false
+  }
+]

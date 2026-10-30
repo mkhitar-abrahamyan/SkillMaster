@@ -43,6 +43,7 @@ Chrome DevTools MCP interactions are CDP-driven, so the user sees no cursor. Bef
 - When debugging is finished (before the final answer), always remove the overlay: `evaluate_script` (`waitForStableDom: false`) with `() => { if (window.__actionTracker) { window.__actionTracker.off(); delete window.__actionTracker; } return !document.getElementById('__action-tracker-host'); }`. Leave no overlay on the user's page, and confirm `typeof window.__actionTracker` no longer shows an overlay if unsure.
 - It only displays what the agent reports; it does not click anything. The panel can cover the bottom-right corner; take element screenshots or run `.off()` when verifying layout there.
 - To log every event (user and agent) instead, use the `action-tracker` skill.
+- To build a Figma design and verify it in the page, use the `figma-implementer` skill, which works in the tab as this skill does.
 
 ### Recipe: check list search
 

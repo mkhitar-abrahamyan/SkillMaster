@@ -24,6 +24,7 @@ checks that actually ran from assumptions that were never verified.
 | Ship | [release-captain](skills/release-captain/SKILL.md) | A version needs preparing, or tagging and publishing all the way to the registry | `READY TO TAG`, `RELEASED`, `PUBLISHED, AWAITING REGISTRY`, `BLOCKED`, `NOT READY` |
 | Hand off | [session-handoff](skills/session-handoff/SKILL.md) | You switch chats, models, tools, or people mid-task | A 40–80 line handoff note built from git and real check results |
 | All stages | [skillmaster-workflow](skills/skillmaster-workflow/SKILL.md) | You want a change taken end to end: understand, plan, implement, verify, review | `VERIFIED`, `PARTIALLY VERIFIED`, `ISSUES REMAIN`, `BLOCKED` |
+| Build | [figma-implementer](skills/figma-implementer/SKILL.md) | A Figma frame or component needs building in the codebase and checking in the running app | `MATCHES`, `MATCHES WITH DEVIATIONS`, `MISMATCHES`, `BLOCKED` |
 | Browser | [chrome-browser](skills/chrome-browser/SKILL.md) | You need to inspect or interact with a page in your running Chrome | Observations and the actions completed |
 | Browser | [action-tracker](skills/action-tracker/SKILL.md) | You want a visible overlay that logs every click and keystroke on a page | Overlay installed; removed when the work is done |
 
@@ -113,6 +114,7 @@ Copy-Item -Recurse SkillMaster\skills\bug-reproducer "$HOME\.claude\skills\"
 | `ci-failure-investigator` | GitHub CLI (`gh`) authenticated for the repository, or a pasted log |
 | `ci-parity-check` | What stands in for CI here: WSL or a Linux VM, Docker or Podman, side-by-side runtime versions |
 | `release-captain` | The project's release pipeline; `gh` to watch it, and the registry's CLI, such as `npm` |
+| `figma-implementer` | A Figma MCP server, the Chrome DevTools MCP server as for `chrome-browser`, and Node.js for its scripts |
 | `chrome-browser`, `action-tracker` | The [Chrome DevTools MCP server](https://github.com/ChromeDevTools/chrome-devtools-mcp) configured as `chrome-devtools`, and Chrome with remote debugging enabled |
 | Contributing | Python 3.9+ with PyYAML, and Node.js |
 
@@ -130,6 +132,7 @@ Copy-Item -Recurse SkillMaster\skills\bug-reproducer "$HOME\.claude\skills\"
 | "Review my uncommitted changes." | P0–P3 findings with confidence labels and a verdict |
 | "Try to break my rate limiter with concurrent requests." | Executed attack tests and `Attack result: BROKEN`, `SURVIVED`, … |
 | "Tests pass on my Windows machine. Will they pass on the Linux CI before I tag?" | Each CI cell run locally from a clean export, flakes measured, and `CI parity: PARITY` or the first divergence |
+| "Implement this Figma frame in our app and verify it on localhost." | A ledger of every design detail, the build with the project's components and tokens, measurements and a pixel comparison per state and breakpoint, `Design match: MATCHES` or the deviations |
 | "Release 2.4.0 and make sure npm actually gets it." | Versions everywhere, dated notes, the gate where the publish runs, the tag, the publish watched to the registry, `Release status: RELEASED` |
 | "I'm switching to a new chat. Write a handoff." | A handoff note with fresh/stale check status and an immediately executable next step |
 | "Use SkillMaster to add Google sign-in to my NestJS API, test it, and review it for security problems." | All stages run, ending in a `Delivery result:` report |
@@ -168,7 +171,7 @@ scripts/blocks/             code embedded in self-contained scripts, such as the
 evals/<name>.json           trigger evals: prompts that should and should not activate each skill
 examples/                   end-to-end walkthroughs
 tools/validate_skills.py    the CI validator
-tools/test_*.mjs            tests of the shared scripts: the trackers' masking and the mutation runner
+tools/test_*.mjs            tests of the bundled scripts: the trackers' masking, the mutation runner, and figma-implementer's measuring and pixel comparison
 .claude-plugin/             Claude Code plugin and marketplace manifests
 ```
 
@@ -179,8 +182,7 @@ tools/test_*.mjs            tests of the shared scripts: the trackers' masking a
    `scripts/blocks/`, then run `python tools/validate_skills.py --fix` to sync the copies.
 2. Add `evals/<skill>.json` with at least three prompts that should trigger the skill and three
    near-misses that should not.
-3. Run `python tools/validate_skills.py`, `node tools/test_trackers.mjs`, and
-   `node tools/test_mutate.mjs`. CI runs the same on every push and pull request: frontmatter against
+3. Run `python tools/validate_skills.py` and each `node tools/test_*.mjs`. CI runs the same on every push and pull request: frontmatter against
    the spec, links and bundled paths, drift of shared references, scripts, and blocks, JavaScript
    syntax, eval coverage and prompts claimed by two skills, plugin manifests, and the shared scripts'
    own tests.
@@ -202,7 +204,7 @@ python -m scripts.run_eval --eval-set /path/to/SkillMaster/evals/bug-reproducer.
 | v0.2 | repo-context-builder, feature-planner, bug-reproducer | Done |
 | v0.3 | ai-code-verifier, test-gap-finder, safe-refactor, ci-failure-investigator, session-handoff | Done |
 | v0.4 | skillmaster-workflow and end-to-end examples | Done |
-| v0.5 | Tracker masking proven in Chrome, a shared mutation runner, sharper skills, ci-parity-check, release-captain | Ready, not released |
+| v0.5 | Tracker masking proven in Chrome, a shared mutation runner, sharper skills, ci-parity-check, release-captain, figma-implementer | Ready, not released |
 | v1.0 | One-command install (Claude Code plugin and `gh skill`), trigger-eval runs, behavioral evaluations, tested compatibility across assistants | Install done; eval runs and cross-assistant testing open |
 
 Planned specialized skills: React and Next.js performance, accessibility, NestJS API contracts, and
