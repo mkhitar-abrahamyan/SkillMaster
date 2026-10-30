@@ -26,11 +26,13 @@ show the reproduction turn from red to green.
    known. Ask only when the bug cannot be approached without a missing fact.
 2. **Reproduce before fixing.** Run the reported steps, then shrink them to the smallest
    deterministic reproduction at the lowest layer that still shows the symptom, preferably an
-   automated test in the project's framework. Assert on the reported symptom, not on an incidental
-   error. Run it and keep the failing output. **When it fails only sometimes,** measure it: run
-   the reproduction many times (for example 50) and record the failure rate, and control clock,
-   randomness, ordering, and concurrency to raise it. On Windows and WSL, wait on the wall clock the
-   code reads rather than on timers, which can drift apart.
+   automated test in the project's framework. For a flow in the browser, the trackers of
+   `action-tracker` and `chrome-browser` record it as a Playwright test, with failed requests and
+   page errors marked where they happened, to shrink from. Assert on the reported symptom, not on
+   an incidental error. Run it and keep the failing output. **When it fails only sometimes,**
+   measure it: run the reproduction many times (for example 50) and record the failure rate, and
+   control clock, randomness, ordering, and concurrency to raise it. On Windows and WSL, wait on
+   the wall clock the code reads rather than on timers, which can drift apart.
 3. **When it does not reproduce,** vary one factor at a time toward the reporter's environment:
    versions, configuration, data shape and size, locale and timezone, concurrency and timing,
    cache state, permissions. Use `git bisect` when a known-good revision exists. After a bounded

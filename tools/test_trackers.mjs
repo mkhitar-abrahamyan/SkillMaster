@@ -54,13 +54,15 @@ for (const [attributes, expected, what] of cases) {
 assert.equal(secret(field({ name: 'notes' }, 'TEXTAREA')), false, 'a plain textarea');
 assert.equal(secret(field({ name: 'privateKey' }, 'TEXTAREA')), true, 'a private key in a textarea');
 assert.equal(secret({ tagName: 'BUTTON', getAttribute: () => 'password' }), false, 'not a field');
+assert.equal(secret(field({ autocomplete: 'cc-exp-month' }, 'SELECT')), true, 'a card expiry month to choose');
+assert.equal(secret(field({ name: 'country' }, 'SELECT')), false, 'a plain select');
 // Seen once as a password, a field stays masked after a "show password" toggle.
 const toggled = field({ type: 'password' });
 assert.equal(secret(toggled), true);
 toggled.type = 'text';
 assert.equal(secret(toggled), true, 'still masked after the toggle');
 assert.equal(MASK.length, 3);
-console.log(`ok - the sensitive-field policy: ${cases.length + 5} cases`);
+console.log(`ok - the sensitive-field policy: ${cases.length + 7} cases`);
 
 // ── Both overlays, in a browser ──────────────────────────────────────
 

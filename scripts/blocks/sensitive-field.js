@@ -15,7 +15,7 @@
   const wasPassword = new WeakSet();
   const secret = (el) => {
     if (!el || !el.getAttribute) return false;
-    const field = el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable;
+    const field = el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable;
     if (!field) return false;
     if (el.type === 'password') wasPassword.add(el);
     if (wasPassword.has(el) || el.type === 'hidden' || el.hasAttribute('data-tracker-mask')) return true;

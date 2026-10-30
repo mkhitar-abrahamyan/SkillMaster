@@ -16,6 +16,10 @@
     "should_trigger": true
   },
   {
+    "query": "Record what I click through on the localhost tab, with any requests that fail, and give me a Playwright test of it",
+    "should_trigger": true
+  },
+  {
     "query": "Inspect the dashboard tab in Chrome and tell me why the sidebar overlaps the header",
     "should_trigger": false
   },

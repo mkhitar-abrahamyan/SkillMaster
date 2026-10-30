@@ -26,7 +26,7 @@ checks that actually ran from assumptions that were never verified.
 | All stages | [skillmaster-workflow](skills/skillmaster-workflow/SKILL.md) | You want a change taken end to end: understand, plan, implement, verify, review | `VERIFIED`, `PARTIALLY VERIFIED`, `ISSUES REMAIN`, `BLOCKED` |
 | Build | [figma-implementer](skills/figma-implementer/SKILL.md) | A Figma design needs building and checking in the running app; a Figma tab and a localhost tab are all it needs | `MATCHES`, `MATCHES WITH DEVIATIONS`, `MISMATCHES`, `BLOCKED` |
 | Browser | [chrome-browser](skills/chrome-browser/SKILL.md) | You need to inspect or interact with a page in your running Chrome | Observations and the actions completed |
-| Browser | [action-tracker](skills/action-tracker/SKILL.md) | You want a visible overlay that logs every click and keystroke on a page | Overlay installed; removed when the work is done |
+| Browser | [action-tracker](skills/action-tracker/SKILL.md) | You want a visible overlay that logs every click and keystroke on a page, or a Playwright test of what you clicked through | Overlay installed, the log or test handed over; removed when the work is done |
 
 ## The workflow
 
@@ -153,13 +153,18 @@ Copy-Item -Recurse SkillMaster\skills\bug-reproducer "$HOME\.claude\skills\"
   stored credentials, and remove their overlays when done. Enable remote debugging only while you
   need it, ideally in a profile without unrelated signed-in sessions.
 - The tracker overlays are click-through except their panel's grip and buttons, which move it, fold
-  it, and copy its log; the panel moves off an element before the agent acts on it.
+  it, and copy its log or a Playwright test of its steps; the panel moves off an element before the
+  agent acts on it. Between the actions they log failed requests and page errors, and they keep
+  the recording in the tab's session storage, so it continues after a reload once the script runs
+  again. `.off()` drops it.
 - Both tracker overlays mask what is typed into sensitive fields, because the overlay appears in
   screenshots: passwords, payment fields, one-time codes, API keys and tokens, PINs, and bank and
   government IDs show as `•••` whatever their length, and their keystrokes are not logged. A field
-  stays masked after a "show password" toggle, and `data-tracker-mask` masks any other field. The
-  policy is [scripts/blocks/sensitive-field.js](scripts/blocks/sensitive-field.js), embedded in both
-  overlays, and `tools/test_trackers.mjs` proves it in headless Chrome on every push.
+  stays masked after a "show password" toggle, and `data-tracker-mask` masks any other field. An
+  exported test fills a masked field from an environment variable; tokens in URLs and errors are
+  masked too. The policy is [scripts/blocks/sensitive-field.js](scripts/blocks/sensitive-field.js),
+  embedded in both overlays, and `tools/test_trackers.mjs` and `tools/test_recording.mjs` prove it
+  in headless Chrome on every push.
 
 ## Repository layout
 
@@ -173,7 +178,7 @@ scripts/blocks/             code embedded in self-contained scripts, such as the
 evals/<name>.json           trigger evals: prompts that should and should not activate each skill
 examples/                   end-to-end walkthroughs
 tools/validate_skills.py    the CI validator
-tools/test_*.mjs            tests of the bundled scripts: the trackers' masking, the mutation runner, and figma-implementer's measuring and pixel comparison
+tools/test_*.mjs            tests of the bundled scripts: the trackers' masking and recording, the mutation runner, and figma-implementer's measuring and pixel comparison
 .claude-plugin/             Claude Code plugin and marketplace manifests
 ```
 
@@ -206,7 +211,7 @@ python -m scripts.run_eval --eval-set /path/to/SkillMaster/evals/bug-reproducer.
 | v0.2 | repo-context-builder, feature-planner, bug-reproducer | Done |
 | v0.3 | ai-code-verifier, test-gap-finder, safe-refactor, ci-failure-investigator, session-handoff | Done |
 | v0.4 | skillmaster-workflow and end-to-end examples | Done |
-| v0.5 | Tracker masking proven in Chrome, a shared mutation runner, sharper skills, ci-parity-check, release-captain, figma-implementer | Ready, not released |
+| v0.5 | Tracker masking proven in Chrome, tracker recordings as Playwright tests, a shared mutation runner, sharper skills, ci-parity-check, release-captain, figma-implementer | Ready, not released |
 | v1.0 | One-command install (Claude Code plugin and `gh skill`), trigger-eval runs, behavioral evaluations, tested compatibility across assistants | Install done; eval runs and cross-assistant testing open |
 
 Planned specialized skills: React and Next.js performance, accessibility, NestJS API contracts, and

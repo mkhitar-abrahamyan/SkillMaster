@@ -1,9 +1,7 @@
   // The log panel. The overlay stays click-through except the panel's grip and buttons, so the page
-  // gets every click meant for it. The panel keeps the last HISTORY lines for copying while it shows
-  // the last MAX_LOG, can be dragged by its grip and collapsed, and moves out of the way of an element
-  // the agent is about to act on.
-  const HISTORY = 500;
-  const lines = [];
+  // gets every click meant for it. It shows the last MAX_LOG lines of the recording, copies all of it
+  // or a Playwright test of its steps, can be dragged by its grip and folded, keeps its place across a
+  // reload, and moves out of the way of an element the agent is about to act on.
   const panel = $('panel');
   const heading = panel.querySelector('h4');
   const controls = document.createElement('style');
@@ -21,6 +19,7 @@
   const title = heading.textContent;
   heading.innerHTML =
     '<span class="grip" id="grip" title="Drag to move">⠿</span><span class="title"></span>' +
+    '<button class="button" id="test" title="Copy a Playwright test of these steps">Test</button>' +
     '<button class="button" id="copy" title="Copy the whole log">Copy</button>' +
     '<button class="button" id="fold" title="Collapse or expand">–</button>';
   heading.querySelector('.title').textContent = title;
@@ -36,11 +35,11 @@
     lines.push({ kind, text, at: clock() });
     if (lines.length > HISTORY) lines.shift();
     render();
+    save();
   };
   // The whole log as text, values already masked as the panel shows them.
   const exportLog = () => lines.map((l) => `${l.at} ${l.kind.toUpperCase()} ${l.text}`).join('\n');
-  const copy = async () => {
-    const text = exportLog();
+  const copyText = async (text, button) => {
     try {
       await navigator.clipboard.writeText(text);
     } catch {
@@ -53,18 +52,26 @@
       document.execCommand('copy');
       area.remove();
     }
-    $('copy').textContent = 'Copied';
-    setTimeout(() => { $('copy').textContent = 'Copy'; }, 1200);
+    const label = $(button).textContent;
+    $(button).textContent = 'Copied';
+    setTimeout(() => { $(button).textContent = label; }, 1200);
   };
+  const copy = () => copyText(exportLog(), 'copy');
+  const copyTest = () => copyText(toPlaywright(), 'test');
 
   const place = (x, y) => {
     const r = panel.getBoundingClientRect();
-    Object.assign(panel.style, {
-      left: Math.max(0, Math.min(innerWidth - r.width, x)) + 'px',
-      top: Math.max(0, Math.min(innerHeight - r.height, y)) + 'px',
-      right: 'auto',
-      bottom: 'auto',
-    });
+    const left = Math.max(0, Math.min(innerWidth - r.width, x));
+    const top = Math.max(0, Math.min(innerHeight - r.height, y));
+    Object.assign(panel.style, { left: left + 'px', top: top + 'px', right: 'auto', bottom: 'auto' });
+    state.panel = { left, top };
+    save();
+  };
+  const fold = (collapsed) => {
+    panel.classList.toggle('collapsed', collapsed);
+    $('fold').textContent = collapsed ? '+' : '–';
+    state.collapsed = collapsed;
+    save();
   };
   let drag;
   $('grip').addEventListener('pointerdown', (e) => {
@@ -75,10 +82,21 @@
   $('grip').addEventListener('pointermove', (e) => { if (drag) place(e.clientX - drag.dx, e.clientY - drag.dy); });
   $('grip').addEventListener('pointerup', () => { drag = undefined; });
   $('copy').addEventListener('click', copy);
-  $('fold').addEventListener('click', () => {
-    panel.classList.toggle('collapsed');
-    $('fold').textContent = panel.classList.contains('collapsed') ? '+' : '–';
-  });
+  $('test').addEventListener('click', copyTest);
+  $('fold').addEventListener('click', () => fold(!panel.classList.contains('collapsed')));
+  // Where the panel was before a reload, and what it showed; again once it is on the page, so the
+  // place it is put back is measured and kept inside a window that has since shrunk.
+  const restore = () => {
+    render();
+    if (state.panel) place(state.panel.left, state.panel.top);
+    if (state.collapsed) fold(true);
+  };
+  // The overlay on the page. Run as a new-document script, before the page is parsed, there is no
+  // element to hold it yet: it goes on once the page is parsed.
+  const show = () => {
+    if (document.documentElement) document.documentElement.appendChild(host);
+    else document.addEventListener('readystatechange', () => { show(); restore(); }, { once: true });
+  };
 
   // Moves the panel to the corner farthest from a box it covers, so a click there reaches the page;
   // collapses it when no corner is clear. Whether it moved.
@@ -92,10 +110,7 @@
     const x = rect.left + rect.width / 2 < innerWidth / 2 ? innerWidth - p.width - 12 : 12;
     const y = rect.top + rect.height / 2 < innerHeight / 2 ? innerHeight - p.height - 12 : 12;
     place(x, y);
-    if (covers(rect)) {
-      panel.classList.add('collapsed');
-      $('fold').textContent = '+';
-    }
+    if (covers(rect)) fold(true);
     return true;
   };
   const dodgeTarget = (sel) => {
