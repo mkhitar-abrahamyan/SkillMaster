@@ -19,6 +19,9 @@ skill's script, which creates `.context/` the first time:
 node <skill folder>/scripts/ctx.mjs start --task "csv export" --agent claude-code
 ```
 
+Without an agent, run the same from a clone of SkillMaster:
+`node SkillMaster/skills/context-keeper/scripts/ctx.mjs start ...`.
+
 From then on the project has its own copy, and every tool uses that one:
 
 ```text
@@ -28,6 +31,7 @@ node .context/ctx.mjs note next "Quote fields that hold commas"
 node .context/ctx.mjs check -- npm test
 node .context/ctx.mjs save --file <record>
 node .context/ctx.mjs list
+node .context/ctx.mjs doctor          what could keep it from working, and the fix for each
 ```
 
 `.context/` has a `.gitignore` of its own, so git ignores it. Delete that file only to share the
@@ -87,10 +91,22 @@ conversation's record with `node .context/ctx.mjs start`, and save it as the wor
 
 ## 6. Check that it works
 
+- `node .context/ctx.mjs doctor` checks Node.js, the folder, the project's copy of the script, each
+  tool's hooks, and the errors they wrote down, and gives the command that fixes each.
 - `node .context/ctx.mjs list` shows a record per conversation; `.context/index.md` lists them too.
 - After a wired session that changed files, its record is in `.context/conversations/`.
 - A hook that fails never stops the tool: its error is in `.context/hook-errors.log`.
 
-## 7. Remove it
+## 7. When something is off
+
+- **The project moved or was renamed:** the hooks run the script by its full path, so wire again
+  each tool you had wired, such as `node .context/ctx.mjs wire claude`. `doctor` names which.
+- **SkillMaster was updated:** the project keeps its own copy of the script, which the hooks run.
+  `node <skill folder>/scripts/ctx.mjs init` brings it up to date; the agent does this when it
+  uses the skill.
+- **A hook cannot run at all:** each tool needs Node.js 18 or later on its PATH, the one its hooks
+  run with.
+
+## 8. Remove it
 
 `node .context/ctx.mjs unwire all`, then delete `.context/`.

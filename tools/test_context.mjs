@@ -267,6 +267,79 @@ try {
   assert.match(out.stdout, /passed, fresh: /, `and leave the check fresh:\n${out.stdout}`);
   console.log('ok - shared through git, the records never make the code look changed');
 
+  // ── The project's own folder, never one above it ────────────────────
+  const outer = path.join(work, 'outer');
+  mkdirSync(outer, { recursive: true });
+  assert.equal(run(outer, ['start', '--task', 'outer', '--agent', 'aider']).status, 0);
+  const inner = project(path.join('outer', 'inner'));
+  // From a drive letter in lower case, as VS Code's terminal has it, while git reports it in upper.
+  out = run(process.platform === 'win32' ? inner.replace(/^[A-Z]:/, (drive) => drive.toLowerCase()) : inner, ['start', '--task', 'inner', '--agent', 'codex']);
+  assert.equal(out.status, 0, out.stderr);
+  assert.ok(existsSync(path.join(inner, '.context', 'conversations')), 'a repository inside a folder with .context/ gets its own');
+  assert.equal(recordsIn(outer).length, 1, "and the outer folder's records are left alone");
+  // Nor the home folder's: a .context/ there would take in every project under it.
+  const home = path.join(work, 'home');
+  mkdirSync(path.join(home, '.context', 'conversations'), { recursive: true });
+  mkdirSync(path.join(home, 'notes'), { recursive: true });
+  out = spawnSync(process.execPath, [CTX, 'start', '--task', 'notes', '--agent', 'aider'], {
+    cwd: path.join(home, 'notes'),
+    encoding: 'utf8',
+    env: { ...env, HOME: home, USERPROFILE: home },
+  });
+  assert.equal(out.status, 0, out.stderr);
+  assert.ok(existsSync(path.join(home, 'notes', '.context', 'conversations')), 'a folder under home gets its own .context/');
+  assert.deepEqual(readdirSync(path.join(home, '.context', 'conversations')), [], "and home's is left alone");
+  console.log("ok - records go to the project's own .context/, never to one above the repository or in the home folder");
+
+  // ── A heading in another case is the same section ───────────────────
+  const cased = project('cased');
+  out = run(cased, ['start', '--task', 'case', '--agent', 'claude-code']);
+  const casedFile = path.join(cased, recordOf(out.stdout));
+  writeFileSync(casedFile, read(casedFile).replace('## Next actions\n\n- None yet.\n', () => '## Next Actions\n\n- Ship it.\n'));
+  assert.equal(run(cased, ['note', 'next', 'Then announce it']).status, 0);
+  const casedText = read(casedFile);
+  assert.equal(casedText.match(/^## next actions$/gim).length, 1, `one Next actions section, whatever its case:\n${casedText}`);
+  assert.match(casedText, /- Ship it\.\n- Then announce it/, `the note joins it:\n${casedText}`);
+  out = run(cased, ['start', '--agent', 'codex']);
+  assert.match(read(path.join(cased, recordOf(out.stdout))), /- Ship it\./, 'and the next conversation carries it over');
+  console.log('ok - a section is found whatever the case of its heading');
+
+  // ── doctor: what could keep it from working, and the fix for each ───
+  const doc = project('doctor');
+  out = run(doc, ['doctor']);
+  assert.equal(out.status, 1, 'no .context/ yet is a problem to fix');
+  assert.match(out.stdout, /fix {2}No \.context\/ in .*: node ".*ctx\.mjs" start/, out.stdout);
+  assert.equal(run(doc, ['start', '--task', 'doc', '--agent', 'codex']).status, 0);
+  assert.equal(run(doc, ['wire', 'all']).status, 0);
+  out = run(doc, ['doctor']);
+  assert.equal(out.status, 0, `a healthy setup:\n${out.stdout}`);
+  assert.match(out.stdout, /ok {3}Claude Code hooks in \.claude\/settings\.local\.json/, out.stdout);
+  assert.match(out.stdout, /ok {3}Codex hooks in \.codex\/hooks\.json/, out.stdout);
+  // The project moved: the hooks run a script that is no longer there.
+  const codexHooks = path.join(doc, '.codex', 'hooks.json');
+  writeFileSync(codexHooks, read(codexHooks).replaceAll('/.context/ctx.mjs', '/moved/ctx.mjs'));
+  out = run(doc, ['doctor']);
+  assert.equal(out.status, 1, `hooks that run a missing script are a problem:\n${out.stdout}`);
+  assert.match(out.stdout, /fix {2}Codex hooks in \.codex\/hooks\.json: .*not there.*: node \.context\/ctx\.mjs wire codex/, out.stdout);
+  assert.equal(run(doc, ['wire', 'codex']).status, 0);
+  assert.equal(run(doc, ['doctor']).status, 0, 'wired again, they work');
+  // The hooks wrote an error down.
+  writeFileSync(path.join(doc, '.context', 'hook-errors.log'), '2026-10-30T10:00:00.000+04:00 codex Stop: Error: something broke\n    at somewhere\n');
+  out = run(doc, ['doctor']);
+  assert.equal(out.status, 1, `a hook error is a problem:\n${out.stdout}`);
+  assert.match(out.stdout, /fix {2}1 hook error\(s\), the last: .*something broke/, out.stdout);
+  unlinkSync(path.join(doc, '.context', 'hook-errors.log'));
+  // SkillMaster was updated: the project's copy is older than the skill's.
+  const copyFile = path.join(doc, '.context', 'ctx.mjs');
+  writeFileSync(copyFile, read(copyFile).replace(/^const VERSION = \d+;/m, 'const VERSION = 1;'));
+  out = run(doc, ['doctor']);
+  assert.equal(out.status, 1, `a project copy older than the skill's is a problem:\n${out.stdout}`);
+  assert.match(out.stdout, /fix {2}\.context\/ctx\.mjs is version 1, older than this script's \d+: node ".*" init/, out.stdout);
+  assert.equal(run(doc, ['init']).status, 0);
+  assert.equal(read(copyFile), read(CTX), 'init brings the copy up to date');
+  assert.equal(run(doc, ['doctor']).status, 0, 'and all is well again');
+  console.log('ok - doctor finds a missing folder, a moved project, hook errors, and an old copy, each with its fix');
+
   // ── Without git ──────────────────────────────────────────────────────
   const plain = project('plain', { git: false });
   out = run(plain, ['start', '--task', 'notes', '--agent', 'aider']);

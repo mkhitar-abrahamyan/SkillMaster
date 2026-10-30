@@ -62,7 +62,7 @@ Claude Code, Codex, and tools on a local Ollama model pick up where the last one
 2. `node .context/ctx.mjs wire all` makes Claude Code and Codex resume and save by themselves;
    approve the hooks once with `/hooks` in Codex.
 3. In any other tool, `node .context/ctx.mjs resume` tells where things stand, and Aider or
-   opencode can read `.context/BRIEF.md`.
+   opencode can read `.context/BRIEF.md`. `node .context/ctx.mjs doctor` checks the setup.
 
 The [setup guide](skills/context-keeper/references/setup.md) covers each tool, how to check that
 it works, and how to remove it.

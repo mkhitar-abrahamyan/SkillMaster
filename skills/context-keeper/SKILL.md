@@ -32,14 +32,18 @@ copy, `.context/ctx.mjs`, which every tool can run; the commands below use that 
 asks how to set it up for a tool, follow [Setup](references/setup.md), the guide for each tool.
 
 1. **Resume.** At the start of work in a project that has `.context/`, or when the user says to
-   continue: `node .context/ctx.mjs resume`. It prints the latest open record and what changed in
-   git since it was saved. With the hooks wired, a session already starts with it.
+   continue, first run this skill's copy from the project's folder:
+   `node <this skill's folder>/scripts/ctx.mjs init`. It updates the project's copy when this one
+   is newer, as after SkillMaster was updated; the hooks run the project's copy. Then
+   `node .context/ctx.mjs resume` prints the latest open record and what changed in git since it
+   was saved. With the hooks wired, a session already starts with it.
 2. **Start this conversation's record:** `node .context/ctx.mjs start --task <short task name>
    --agent <your tool, such as claude-code, codex, or aider>`, adding `--session <id>` when the
    session id is known, as the hooks tell it. In a project without `.context/`, run the copy beside
    this file, `node scripts/ctx.mjs start ...`, from the project's directory: it creates the
    folder. The new record carries over the last one's goal, next actions, decisions, dead ends,
-   and open questions; keep the path it prints for `--file`.
+   and open questions; keep the path it prints for `--file`. Use the task name the brief gives, so
+   the records chain; a new name starts a separate task.
 3. **Verify before continuing.** Confirm the claims the next step depends on: read the files the
    record names, and re-run stale checks with `node .context/ctx.mjs check -- <command>`, which
    records the result and the code it ran on.
@@ -58,7 +62,10 @@ asks how to set it up for a tool, follow [Setup](references/setup.md), the guide
    Codex does the same from `.codex/hooks.json`, once the user trusts the hooks with `/hooks` in
    Codex. Both files are kept out of git through `.git/info/exclude`; `unwire` removes the hooks.
    The hooks save the facts; the notes are still yours to write.
-7. **Other tools.** `.context/BRIEF.md` is the latest open record, short, rewritten at every save.
+7. **When something is off**, such as no brief at a session's start, no record after a wired
+   session that changed files, or a hook error: `node .context/ctx.mjs doctor` names each cause
+   with the command that fixes it, a project that moved since `wire` included.
+8. **Other tools.** `.context/BRIEF.md` is the latest open record, short, rewritten at every save.
    Point a tool that reads files at it, such as `aider --read .context/BRIEF.md`, opencode's
    `instructions`, or a Continue rule. For a chat with no file access, such as a local Ollama chat,
    `resume --copy` puts the brief on the clipboard to paste.

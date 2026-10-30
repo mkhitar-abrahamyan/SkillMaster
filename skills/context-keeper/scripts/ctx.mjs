@@ -13,6 +13,7 @@
  *   node ctx.mjs check [--task <name>] -- <command>   run a check and remember its result
  *   node ctx.mjs resume [--task <name>] [--full] [--copy]
  *   node ctx.mjs list
+ *   node ctx.mjs doctor                        what could keep it from working, and the fix for each
  *   node ctx.mjs wire <claude|codex|all>       resume and save by themselves, through hooks
  *   node ctx.mjs unwire <claude|codex|all>
  *   node ctx.mjs hook <claude|codex>           what those hooks run; the event arrives on stdin
@@ -33,11 +34,12 @@ import {
   statSync,
   writeFileSync,
 } from 'node:fs';
+import { homedir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 // Raised when the record format or the script's behavior changes: init replaces an older copy.
-const VERSION = 1;
+const VERSION = 2;
 const SELF = fileURLToPath(import.meta.url);
 const DIR = '.context';
 const SECTIONS = ['Goal', 'Done', 'Next actions', 'Decisions', 'Dead ends', 'Open questions', 'Notes'];
@@ -142,16 +144,25 @@ function paths(root) {
   };
 }
 const rel = (root, file) => path.relative(root, file).split(path.sep).join('/');
-// The project: the nearest folder up that has a .context/, else the git work tree, else here.
+// Windows paths differ only in case as often as not, such as a drive letter.
+const samePath = (a, b) => (process.platform === 'win32' ? a.toLowerCase() === b.toLowerCase() : a === b);
+// The project: the nearest folder up that has a .context/, never past the top of the git work tree
+// and never the home folder, whose .context/ would take in every project under it; else the work
+// tree's top, else here.
 function findRoot(from = process.cwd()) {
-  for (let dir = path.resolve(from); ; ) {
+  const start = path.resolve(from);
+  const top = git(['rev-parse', '--show-toplevel'], start)?.trim();
+  const boundary = top ? path.resolve(top) : undefined;
+  const home = path.resolve(homedir());
+  for (let dir = start; ; ) {
+    if (samePath(dir, home) && !samePath(dir, start)) break;
     if (existsSync(path.join(dir, DIR, 'conversations'))) return dir;
+    if (boundary && samePath(dir, boundary)) break;
     const up = path.dirname(dir);
     if (up === dir) break;
     dir = up;
   }
-  const top = git(['rev-parse', '--show-toplevel'], from);
-  return path.resolve(top ? top.trim() : from);
+  return boundary ?? start;
 }
 
 // ── Git: the facts a record carries ──────────────────────────────────
@@ -266,8 +277,10 @@ function records(root) {
     .sort((a, b) => time(b) - time(a) || b.file.localeCompare(a.file));
 }
 const latestOpen = (all) => all.find((record) => record.meta.status !== 'done') ?? all[0];
+// A heading in any case: a model that writes "## Next Actions" means the same section.
+const isHeading = (line, name) => line.trim().toLowerCase() === `## ${name}`.toLowerCase();
 function sectionBounds(lines, name) {
-  const start = lines.findIndex((line) => line.trim() === `## ${name}`);
+  const start = lines.findIndex((line) => isHeading(line, name));
   if (start === -1) return undefined;
   const end = lines.findIndex((line, i) => i > start && (line.startsWith('## ') || line.startsWith('<!-- ctx:')));
   return { start, end: end === -1 ? lines.length : end };
@@ -607,6 +620,56 @@ function list() {
   return 0;
 }
 
+// What could keep the context from working, each with the command that fixes it: an old Node, no
+// folder, a project copy older than this script, hooks that point at a script no longer there, as
+// after the project moved, and errors the hooks wrote down.
+function doctor() {
+  const root = findRoot();
+  const p = paths(root);
+  let problems = 0;
+  const report = (ok, text, fix = '') => {
+    print(`${ok ? 'ok  ' : 'fix '} ${text}${fix ? `: ${fix}` : ''}`);
+    if (!ok) problems++;
+  };
+  const self = `node "${SELF.split(path.sep).join('/')}"`;
+  const major = Number(process.versions.node.split('.')[0]);
+  report(major >= 18, `Node.js ${process.versions.node}`, major >= 18 ? '' : 'install Node.js 18 or later');
+  if (git(['rev-parse', '--is-inside-work-tree'], root)?.trim() !== 'true') print('note Not a git repository: records keep no branch, changes, or check freshness.');
+  if (!existsSync(p.conversations)) {
+    report(false, `No ${DIR}/ in ${root}`, `${self} start --task <name> --agent <your tool>`);
+    return 1;
+  }
+  report(true, `${DIR}/ in ${root}, with ${records(root).length} record(s)`);
+  if (!existsSync(path.join(p.dir, '.gitignore'))) print(`note ${DIR}/.gitignore is gone, so git sees the records: they will be committed with the project.`);
+  const copy = versionOf(p.script);
+  if (!existsSync(p.script)) report(false, `${DIR}/ctx.mjs is missing`, `${self} init`);
+  else if (!samePath(path.resolve(SELF), path.resolve(p.script)) && copy < VERSION) report(false, `${DIR}/ctx.mjs is version ${copy}, older than this script's ${VERSION}`, `${self} init`);
+  else report(true, `${DIR}/ctx.mjs, version ${copy}`);
+  for (const [tool, { name, file }] of Object.entries(HOOKS)) {
+    let commands = [];
+    try {
+      const settings = JSON.parse(readFileSync(path.join(root, file), 'utf8'));
+      commands = Object.values(settings.hooks ?? {})
+        .flat()
+        .flatMap((group) => group.hooks ?? [])
+        .map((entry) => String(entry.command ?? ''))
+        .filter((command) => command.includes(OURS));
+    } catch {
+      // Not there, or not JSON: not wired.
+    }
+    if (!commands.length) {
+      print(`note ${name} is not wired: node ${DIR}/ctx.mjs wire ${tool} makes it resume and save by itself.`);
+      continue;
+    }
+    const gone = commands.some((command) => !existsSync(/node "([^"]+)"/.exec(command)?.[1] ?? ''));
+    report(!gone, `${name} hooks in ${file}`, gone ? `they run a script that is not there, as after the project moved: node ${DIR}/ctx.mjs wire ${tool}` : '');
+    if (tool === 'codex' && !gone) print('note Codex runs hooks only once trusted: /hooks in Codex.');
+  }
+  const errors = (existsSync(p.errors) ? readFileSync(p.errors, 'utf8') : '').split('\n').filter((line) => /^\d{4}-\d{2}-\d{2}T/.test(line));
+  if (errors.length) report(false, `${errors.length} hook error(s), the last: ${maskText(errors[errors.length - 1]).slice(0, 200)}`, `see ${DIR}/hook-errors.log, and delete it once fixed`);
+  return problems ? 1 : 0;
+}
+
 // ── Hooks: resume and save without being asked ───────────────────────
 
 function readInput() {
@@ -771,7 +834,7 @@ function keepLocal(root, file) {
 
 // ── Main ─────────────────────────────────────────────────────────────
 
-const COMMANDS = { init, start, save, note, check, resume, list, wire, unwire, hook };
+const COMMANDS = { init, start, save, note, check, resume, list, doctor, wire, unwire, hook };
 const [name, ...rest] = process.argv.slice(2);
 if (!COMMANDS[name]) {
   // The usage is the comment at the top of this file.
