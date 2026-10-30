@@ -47,10 +47,25 @@ flowchart LR
 Bugs start at `bug-reproducer`, CI failures at `ci-failure-investigator`, refactors at
 `safe-refactor`, screens from a Figma design at `figma-implementer`, and releases at
 `release-captain`, which runs `ci-parity-check` before the tag. Work that moves between chats or
-tools keeps its state in `context-keeper`'s records. A change to a page is also checked
-in the running app, and one headed for CI on another platform is run there first. The final report
-lists the checks that ran on the final code, the assumptions that remain unverified, and the
-residual risks. See [examples/](examples/) for complete walkthroughs.
+tools keeps its state in `context-keeper`'s records. A change to a page is also checked in the
+running app, and one headed for CI on another platform is run there first. The final report lists
+the checks that ran on the final code, the assumptions that remain unverified, and the residual
+risks. See [examples/](examples/) for complete walkthroughs.
+
+## Continue a task in another tool
+
+`context-keeper` keeps a record per conversation in the project's local `.context/` folder, so
+Claude Code, Codex, and tools on a local Ollama model pick up where the last one stopped:
+
+1. Ask your agent to "save the context of this task". The first time, it creates `.context/`,
+   which git ignores.
+2. `node .context/ctx.mjs wire all` makes Claude Code and Codex resume and save by themselves;
+   approve the hooks once with `/hooks` in Codex.
+3. In any other tool, `node .context/ctx.mjs resume` tells where things stand, and Aider or
+   opencode can read `.context/BRIEF.md`.
+
+The [setup guide](skills/context-keeper/references/setup.md) covers each tool, how to check that
+it works, and how to remove it.
 
 ## Install
 
@@ -222,7 +237,7 @@ python -m scripts.run_eval --eval-set /path/to/SkillMaster/evals/bug-reproducer.
 | v0.3 | ai-code-verifier, test-gap-finder, safe-refactor, ci-failure-investigator, session-handoff | Done |
 | v0.4 | skillmaster-workflow and end-to-end examples | Done |
 | v0.5 | Tracker masking proven in Chrome, tracker recordings as Playwright tests, a shared mutation runner, sharper skills, ci-parity-check, release-captain, figma-implementer | Done |
-| v0.6 | context-keeper: a record per conversation in `.context/`, resumed in any chat or tool, saved and resumed by Claude Code and Codex hooks | Ready, not released |
+| v0.6 | context-keeper: a record per conversation in `.context/`, resumed in any chat or tool, saved and resumed by Claude Code and Codex hooks | Done |
 | v1.0 | One-command install (Claude Code plugin and `gh skill`), trigger-eval runs, behavioral evaluations, tested compatibility across assistants | Install done; eval runs and cross-assistant testing open |
 
 Planned specialized skills: React and Next.js performance, accessibility, NestJS API contracts, and

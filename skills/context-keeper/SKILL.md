@@ -28,7 +28,8 @@ done, what is next, what was decided, and what failed.
 ## Workflow
 
 The script is `scripts/ctx.mjs` beside this file. Once `.context/` exists, the project has its own
-copy, `.context/ctx.mjs`, which every tool can run; the commands below use that copy.
+copy, `.context/ctx.mjs`, which every tool can run; the commands below use that copy. When the user
+asks how to set it up for a tool, follow [Setup](references/setup.md), the guide for each tool.
 
 1. **Resume.** At the start of work in a project that has `.context/`, or when the user says to
    continue: `node .context/ctx.mjs resume`. It prints the latest open record and what changed in
