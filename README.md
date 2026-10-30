@@ -24,7 +24,7 @@ checks that actually ran from assumptions that were never verified.
 | Ship | [release-captain](skills/release-captain/SKILL.md) | A version needs preparing, or tagging and publishing all the way to the registry | `READY TO TAG`, `RELEASED`, `PUBLISHED, AWAITING REGISTRY`, `BLOCKED`, `NOT READY` |
 | Hand off | [session-handoff](skills/session-handoff/SKILL.md) | You switch chats, models, tools, or people mid-task | A 40–80 line handoff note built from git and real check results |
 | All stages | [skillmaster-workflow](skills/skillmaster-workflow/SKILL.md) | You want a change taken end to end: understand, plan, implement, verify, review | `VERIFIED`, `PARTIALLY VERIFIED`, `ISSUES REMAIN`, `BLOCKED` |
-| Build | [figma-implementer](skills/figma-implementer/SKILL.md) | A Figma frame or component needs building in the codebase and checking in the running app | `MATCHES`, `MATCHES WITH DEVIATIONS`, `MISMATCHES`, `BLOCKED` |
+| Build | [figma-implementer](skills/figma-implementer/SKILL.md) | A Figma design needs building and checking in the running app; a Figma tab and a localhost tab are all it needs | `MATCHES`, `MATCHES WITH DEVIATIONS`, `MISMATCHES`, `BLOCKED` |
 | Browser | [chrome-browser](skills/chrome-browser/SKILL.md) | You need to inspect or interact with a page in your running Chrome | Observations and the actions completed |
 | Browser | [action-tracker](skills/action-tracker/SKILL.md) | You want a visible overlay that logs every click and keystroke on a page | Overlay installed; removed when the work is done |
 
@@ -132,7 +132,7 @@ Copy-Item -Recurse SkillMaster\skills\bug-reproducer "$HOME\.claude\skills\"
 | "Review my uncommitted changes." | P0–P3 findings with confidence labels and a verdict |
 | "Try to break my rate limiter with concurrent requests." | Executed attack tests and `Attack result: BROKEN`, `SURVIVED`, … |
 | "Tests pass on my Windows machine. Will they pass on the Linux CI before I tag?" | Each CI cell run locally from a clean export, flakes measured, and `CI parity: PARITY` or the first divergence |
-| "Implement this Figma frame in our app and verify it on localhost." | A ledger of every design detail, the build with the project's components and tokens, measurements and a pixel comparison per state and breakpoint, `Design match: MATCHES` or the deviations |
+| "Make my localhost tab match the Figma tab I have open." | A ledger of every design detail, the build with the project's components and tokens, measurements and a pixel comparison per state and breakpoint, `Design match: MATCHES` or the deviations |
 | "Release 2.4.0 and make sure npm actually gets it." | Versions everywhere, dated notes, the gate where the publish runs, the tag, the publish watched to the registry, `Release status: RELEASED` |
 | "I'm switching to a new chat. Write a handoff." | A handoff note with fresh/stale check status and an immediately executable next step |
 | "Use SkillMaster to add Google sign-in to my NestJS API, test it, and review it for security problems." | All stages run, ending in a `Delivery result:` report |

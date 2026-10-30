@@ -20,6 +20,14 @@
     "should_trigger": true
   },
   {
+    "query": "I have the Figma design open in one tab and my app on localhost in another. Make the localhost page match it.",
+    "should_trigger": true
+  },
+  {
+    "query": "Use the Figma tab I have open and implement it in the localhost tab, then check it matches",
+    "should_trigger": true
+  },
+  {
     "query": "Push our Button component from code into Figma as a design",
     "should_trigger": false
   },

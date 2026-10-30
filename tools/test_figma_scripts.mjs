@@ -19,6 +19,7 @@ import { deflateSync } from 'node:zlib';
 const root = path.resolve(fileURLToPath(new URL('..', import.meta.url)));
 const scripts = path.join(root, 'skills', 'figma-implementer', 'scripts');
 const { compare, decodePng, encodePng } = await import(pathToFileURL(path.join(scripts, 'visual-diff.mjs')).href);
+const { readTabs } = await import(pathToFileURL(path.join(scripts, 'read-tabs.mjs')).href);
 const work = mkdtempSync(path.join(tmpdir(), 'skillmaster-figma-'));
 
 function chrome() {
@@ -60,6 +61,31 @@ async function headless(browser, page, extra) {
 }
 
 try {
+  // ── The two tabs ─────────────────────────────────────────────────────
+  const FILE = 'AbCdEfGhIjKlMnOpQrStUv';
+  const BRANCH = 'ZyXwVuTsRqPoNmLkJiHgFe';
+  const tabs = (...urls) => readTabs(urls);
+  const plain = tabs(`https://www.figma.com/design/${FILE}/Checkout?node-id=12-345&t=abc`, 'http://localhost:3000/checkout?step=2', 'https://mail.example.com/');
+  assert.deepEqual(plain.designs, [{ url: `https://www.figma.com/design/${FILE}/Checkout?node-id=12-345&t=abc`, kind: 'design', fileKey: FILE, nodeId: '12:345' }]);
+  assert.deepEqual(plain.pages, [{ url: 'http://localhost:3000/checkout?step=2', origin: 'http://localhost:3000', route: '/checkout?step=2' }]);
+  assert.deepEqual(plain.questions, [], 'one design with a frame, one page: nothing to ask');
+  const branched = tabs(`https://www.figma.com/design/${FILE}/branch/${BRANCH}/Checkout?node-id=12%3A345`, 'http://127.0.0.1:5173/');
+  assert.deepEqual([branched.designs[0].fileKey, branched.designs[0].mainFileKey, branched.designs[0].nodeId], [BRANCH, FILE, '12:345'], 'a branch, an encoded id');
+  assert.deepEqual(tabs(`https://www.figma.com/proto/${FILE}/Flow?node-id=4-5&starting-point-node-id=1-2`, 'http://app.localhost:8080/').designs[0].nodeId, '4:5', 'a prototype link');
+  assert.deepEqual(tabs(`https://www.figma.com/file/${FILE}/Old?node-id=7-8`, 'http://192.168.1.20:3000/').pages[0].origin, 'http://192.168.1.20:3000', 'a dev server on the network');
+  assert.match(tabs(`https://www.figma.com/design/${FILE}/Checkout`, 'http://localhost:3000/').questions.join(), /no frame selected/);
+  assert.match(tabs(`https://www.figma.com/design/${FILE}/A?node-id=1-2`, `https://www.figma.com/design/${BRANCH}/B?node-id=3-4`, 'http://localhost:3000/').questions.join(), /More than one Figma design/);
+  assert.deepEqual(tabs(`https://www.figma.com/design/${FILE}/A?node-id=1-2`, `https://www.figma.com/design/${FILE}/A?node-id=1-2&t=x`, 'http://localhost:3000/').questions, [], 'the same frame twice is one design');
+  assert.match(tabs(`https://www.figma.com/design/${FILE}/A?node-id=1-2`, 'http://localhost:3000/a', 'http://localhost:3000/b').questions.join(), /More than one localhost page/);
+  assert.match(tabs(`https://www.figma.com/board/${FILE}/Notes?node-id=1-2`, 'http://localhost:3000/').questions.join(), /not designs/);
+  assert.deepEqual(
+    tabs('https://example.com/', 'https://figma.com.evil.example/design/x?node-id=1-2', 'file:///C:/page.html').questions,
+    ['No Figma tab is open: open the design, or paste its link.', 'No localhost tab is open: start the dev server and open the page, or say which route to build.'],
+    'other sites, a look-alike host, and a local file are neither',
+  );
+  assert.equal(tabs('https://staging.example.com/', `https://figma.com/design/${FILE}/A?node-id=1-2`).pages.length, 0, 'a remote site is not the local page');
+  console.log('ok - read-tabs.mjs: designs, branches, prototypes, pages, and every question it asks');
+
   // ── PNG, without a browser ───────────────────────────────────────────
   const image = { width: 3, height: 2, rgba: Uint8Array.from([255, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 128, 9, 9, 9, 255, 250, 250, 250, 0, 1, 2, 3, 255]) };
   assert.deepEqual(decodePng(encodePng(image)), image, 'a PNG it writes reads back the same');
