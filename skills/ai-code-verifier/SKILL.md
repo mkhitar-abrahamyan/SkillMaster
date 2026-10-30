@@ -11,8 +11,9 @@ installed code, the package registry, or a command you ran.
 
 ## Boundary and safety
 
-- Keep the reviewed change unchanged; mutations run only in an isolated copy. Follow [Repository](references/repository.md) for target
-  selection, isolated verification writes, and P0–P3 priorities.
+- Keep the reviewed change unchanged; mutations run only in an isolated copy. Follow
+  [Repository](references/repository.md) for target selection, isolated verification writes, and
+  P0–P3 priorities.
 - Check package existence and identity through registry metadata only. Installing an unknown,
   newly published, or near-miss package to test it is the attack this skill guards against;
   report it as a finding instead.
@@ -28,7 +29,11 @@ installed code, the package registry, or a command you ran.
    publish age, and release history, since near-miss names are a supply-chain risk. Examples:
    `npm view <pkg> versions repository.url time.created`, `pip index versions <pkg>`,
    `go list -m -versions <module>`. Confirm the pinned version exists and that the manifest and
-   lockfile changed consistently.
+   lockfile changed consistently. Check everything else the change pulls in by name the same way:
+   GitHub Actions in `uses:` (the action and its tag exist; a third-party action is pinned to a
+   commit SHA), container images and their tags, and tools or MCP servers run through `npx`, `uvx`,
+   or `pipx`. A new package that runs install scripts (`npm view <pkg> scripts`) gets a read of what
+   they run.
 3. **Imports and symbols.** Every import must resolve to a real module and export (default versus
    named, path, casing). Every called API, option, CLI flag, configuration key, environment
    variable, and URL must exist in the **installed** version, with matching arguments and return

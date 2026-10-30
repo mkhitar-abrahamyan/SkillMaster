@@ -33,10 +33,10 @@ way, and measure the page until it matches.
    branch key). The page is a tab on `localhost`, `127.0.0.1`, or the project's dev-server address:
    its URL gives the route to build. Pass the tabs' URLs to `node scripts/read-tabs.mjs <url>...`,
    which reports the design, the page, and any question to ask, rather than reading URLs by eye. A
-   link pasted in the message wins over a tab. Ask only when it is not clear: two Figma or
-   localhost tabs that could each be meant, a Figma URL with no
-   `node-id` (ask the user to select the frame, which puts it in the URL), or no localhost tab, in
-   which case start the dev server and open the route. With no Figma tab, the Figma desktop app's
+   link pasted in the message wins over a tab. Ask only when it is not clear: two Figma or localhost
+   tabs that could each be meant, a Figma URL with no `node-id` (ask the user to select the frame,
+   which puts it in the URL), or no localhost tab, in which case start the dev server and open the
+   route. With no Figma tab, the Figma desktop app's
    current selection, as the Figma server reports it, can name the frame.
 2. **Scope.** List what is in scope: the frame, its variants and states (hover, focus, pressed,
    disabled, error, empty, loading), and its breakpoint frames (mobile, tablet, desktop), which are
@@ -65,7 +65,7 @@ way, and measure the page until it matches.
    rather than absolute positions, put each asset where the design does, and make interactive parts
    interactive.
 7. **Load it in the localhost tab.** Work in the user's tab (`chrome-browser`): reload it when the
-   dev server does not, size the viewport to the frame's width, and note its original size to
+   dev server does not, size the viewport to the frame's width (`resize_page`), and note its original size to
    restore at the end. Confirm the page renders, the console has no new errors, and the target
    element exists. Another tab on the same URL is fine for a second breakpoint.
 8. **Verify against the ledger**, at each breakpoint and in each state:
@@ -83,7 +83,8 @@ way, and measure the page until it matches.
      **Breakpoints:** resize to each frame's width, and between frames.
    - **Assets:** each one local, non-empty, in its design position, at its rendered size and
      proportions, with no temporary Figma URL left in code.
-   - **Accessibility:** names and roles, keyboard reach and visible focus, and text contrast.
+   - **Accessibility:** names and roles, keyboard reach and visible focus, and text contrast, with a
+     Lighthouse accessibility audit (`lighthouse_audit`) where the server offers one.
 9. **Fix and verify again.** Each mismatch goes back to step 6, and is measured again after the
    fix. After two rounds on the same mismatch, stop and record it as a deviation with its cause,
    such as a font the page does not load, a token that differs from the design's value, or two
@@ -109,7 +110,8 @@ Then include:
 - **Design:** the Figma tab or link, file, nodes, and the frames, states, and breakpoints covered;
   whether the ledger came from the Figma server or a screenshot alone.
 - **Implementation:** files changed, the components and tokens reused, and assets added.
-- **Verification:** the localhost tab's URL and the route file it maps to; the viewport per breakpoint; ledger items checked and matched;
-  the pixel comparison per frame, with its share and regions; states exercised; console status.
+- **Verification:** the localhost tab's URL and the route file it maps to; the viewport per
+  breakpoint; ledger items checked and matched; the pixel comparison per frame, with its share and
+  regions; states exercised; console status.
 - **Deviations:** element — property — design — implemented — cause.
 - **Not verified:** what could not be checked, and why.

@@ -30,6 +30,9 @@ Stage 2 depends on the task:
 - **CI failure:** `ci-failure-investigator`, then `bug-reproducer` for `CODE DEFECT` or
   `TEST DEFECT`; other classifications go to the user with the proposed correction.
 - **Refactor:** `safe-refactor`; gate `BEHAVIOR PRESERVED`. Stage 5 attack is optional.
+- **UI from a Figma design:** `figma-implementer` for the screen or component, through stage 4 for
+  it; gate `MATCHES`, or `MATCHES WITH DEVIATIONS` the user accepts. The rest of the change takes
+  the stages as usual.
 - **Release:** after the change is `VERIFIED`, `release-captain`, which runs `ci-parity-check` before
   the tag; publishing still needs the user's explicit request.
 
@@ -44,6 +47,11 @@ Stage 2 depends on the task:
   public contracts, batched at stage 2. Record other open decisions as assumptions.
 - **Scope of review.** Stages 4 and 5 target the complete change from stage 3, including
   uncommitted and untracked files.
+- **In the browser.** A change to what a page shows or does is also checked in the running app
+  with `chrome-browser`; unit tests alone do not show the page.
+- **Where CI runs.** When CI runs on another OS or runtime version than this machine, run
+  `ci-parity-check` before reporting `VERIFIED`; a check that passed only here is reported as
+  passing here, not in CI.
 - **Approval.** Commits, pushes, deployments, migrations against shared databases, and secret
   access each need the user's explicit approval.
 - **Scale.** For a small change, stages 1 and 2 can be a few lines each. Stage 4's test evidence

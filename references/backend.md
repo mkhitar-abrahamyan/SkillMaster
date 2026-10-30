@@ -6,7 +6,11 @@ Load this reference for server, API, database, persistence, or queue changes:
   role checks, and insecure direct object references at every newly reachable operation.
 - Check validation at trust boundaries, API contract and status-code consistency, safe error
   responses, sensitive logging, and whether client-controlled values reach queries, commands, file
-  paths, redirects, or deserializers.
+  paths, redirects, deserializers, outbound URLs (server-side request forgery), or model fields the
+  client must not set (mass assignment).
+- For webhooks and signed requests, check that the signature is verified over the raw body with a
+  constant-time comparison, that a replay outside its time window is refused, and that redelivery
+  is idempotent.
 - Check transaction boundaries, partial writes, uniqueness/race handling, idempotency, retry
   safety, and whether concurrent requests can duplicate or reorder an operation.
 - Look for N+1 queries, missing pagination, unbounded result loading, repeated external calls,

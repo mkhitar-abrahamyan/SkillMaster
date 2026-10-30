@@ -17,7 +17,9 @@ each new test can fail.
   write candidates in scratch space and report them.
 - Keep source code unchanged. Run mutation checks in an isolated copy: a `git worktree` for
   committed targets, or a scratch copy of the working tree for local changes.
-- Make tests deterministic: control network, clock, randomness, and ordering.
+- Make tests deterministic: control network, clock, randomness, and ordering. A test of random or
+  timed behavior asserts exactly, or with a margin no normal run crosses, such as five standard
+  deviations: a bound that a correct run can miss becomes a flake in CI.
 
 ## Workflow
 

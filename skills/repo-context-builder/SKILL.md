@@ -25,8 +25,10 @@ repository without asking again. Every command and convention in it states where
 ## Workflow
 
 1. **Existing guidance first.** Read agent and contributor instructions: `AGENTS.md`, `CLAUDE.md`,
-   `.github/copilot-instructions.md`, `.cursor/rules/`, `CONTRIBUTING.md`, `README.md`, and docs
-   indexes. Treat them as claims to confirm and note where they disagree with the code.
+   `GEMINI.md`, `.github/copilot-instructions.md`, `.github/instructions/`, `.cursor/rules/`,
+   `.windsurf/rules/`, `CONTRIBUTING.md`, `README.md`, and docs indexes, and the skills, commands,
+   and settings the repository ships for agents (`.claude/`, `.agents/skills/`, `.github/skills/`).
+   Treat them as claims to confirm and note where they disagree with the code.
 2. **Shape and stack.** List the top two directory levels, excluding dependency, build, and cache
    directories. Read manifests and lockfiles to name languages, frameworks, package manager, and
    versions (`package.json` plus lockfile type, `pyproject.toml`, `go.mod`, `Cargo.toml`,

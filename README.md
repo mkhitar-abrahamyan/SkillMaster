@@ -44,8 +44,11 @@ flowchart LR
 ```
 
 Bugs start at `bug-reproducer`, CI failures at `ci-failure-investigator`, refactors at
-`safe-refactor`, and releases at `release-captain`, which runs `ci-parity-check` before the tag. The final report lists the checks that ran on the final code, the assumptions that
-remain unverified, and the residual risks. See [examples/](examples/) for complete walkthroughs.
+`safe-refactor`, screens from a Figma design at `figma-implementer`, and releases at
+`release-captain`, which runs `ci-parity-check` before the tag. A change to a page is also checked
+in the running app, and one headed for CI on another platform is run there first. The final report
+lists the checks that ran on the final code, the assumptions that remain unverified, and the
+residual risks. See [examples/](examples/) for complete walkthroughs.
 
 ## Install
 

@@ -302,7 +302,7 @@ try {
     document.getElementById('email').focus();
     act('key', 'a');
     act('key', 'Enter');
-    act('hover', '#menu');
+    act('hover', document.getElementById('menu')); // an element, as evaluate_script passes one by uid
   })()`);
   await click('#tile'); // the user's own click: not the agent's, so not in its test
   // The agent navigates: a goto, not a URL check, as nothing it did on the page led there.
