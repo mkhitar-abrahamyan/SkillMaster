@@ -1,7 +1,7 @@
 {
   "name": "skillmaster",
   "description": "Agent skills for reliable AI coding: repository context, planning, bug reproduction, AI-code verification, test gaps, safe refactoring, CI diagnosis and parity, defect-first review, patch attacks, releases, Figma designs built and measured in the browser, session handoff, and an end-to-end verified workflow.",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "author": {
     "name": "Mkhitar Abrahamyan"
   },
