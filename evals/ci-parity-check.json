@@ -1,0 +1,42 @@
+[
+  {
+    "query": "Tests pass on my Windows machine. Will they pass on the Linux CI before I push the tag?",
+    "should_trigger": true
+  },
+  {
+    "query": "Run our CI matrix locally, Node 20, 22, and 24, against a clean checkout of this commit",
+    "should_trigger": true
+  },
+  {
+    "query": "This new test passes for me but I think it's flaky on CI. Hammer it on Linux and tell me.",
+    "should_trigger": true
+  },
+  {
+    "query": "Before I push, reproduce the GitHub Actions test job locally in Docker",
+    "should_trigger": true
+  },
+  {
+    "query": "Make sure my change doesn't break on Linux line endings or path casing before CI sees it",
+    "should_trigger": true
+  },
+  {
+    "query": "Why is this GitHub Actions run red? https://github.com/acme/api/actions/runs/123",
+    "should_trigger": false
+  },
+  {
+    "query": "Set up a GitHub Actions workflow that runs our tests on every push",
+    "should_trigger": false
+  },
+  {
+    "query": "Release version 2.1 and watch the publish until npm lists it",
+    "should_trigger": false
+  },
+  {
+    "query": "Reproduce the bug where dates show as yesterday for users in UTC-5",
+    "should_trigger": false
+  },
+  {
+    "query": "Our CI pipeline takes 40 minutes. Make it faster.",
+    "should_trigger": false
+  }
+]

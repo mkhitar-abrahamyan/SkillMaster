@@ -17,9 +17,11 @@ checks that actually ran from assumptions that were never verified.
 | Diagnose | [ci-failure-investigator](skills/ci-failure-investigator/SKILL.md) | A GitHub Actions run or PR check is red or flaky | `CODE DEFECT`, `TEST DEFECT`, `FLAKY`, `ENVIRONMENT`, `CONFIGURATION`, `INCONCLUSIVE` |
 | Change | [safe-refactor](skills/safe-refactor/SKILL.md) | Code must be restructured without changing behavior | `BEHAVIOR PRESERVED`, `PRESERVED WITH GAPS`, `ABORTED` |
 | Verify | [ai-code-verifier](skills/ai-code-verifier/SKILL.md) | AI-written code or an AI's "tests pass" claim needs checking | `VERIFIED`, `ISSUES FOUND`, `FAILED`, `INCONCLUSIVE` |
+| Verify | [ci-parity-check](skills/ci-parity-check/SKILL.md) | Local checks pass but CI runs on another OS, runtime version, or clean checkout, or a test may be flaky | `PARITY`, `DIVERGES`, `FLAKY`, `PARTIAL` |
 | Verify | [test-gap-finder](skills/test-gap-finder/SKILL.md) | You need to know which behaviors are untested, and want tests proven to fail on breakage | `ADEQUATE`, `GAPS CLOSED`, `GAPS FOUND`, `DEFECT FOUND`, `INCONCLUSIVE` |
 | Review | [ruthless-code-reviewer](skills/ruthless-code-reviewer/SKILL.md) | A diff, commit, or PR needs a defect-first review | `APPROVE` … `BLOCK`, `INCONCLUSIVE` |
 | Review | [adversarial-patch-attacker](skills/adversarial-patch-attacker/SKILL.md) | You explicitly want a patch attacked with reproduction tests | `SURVIVED`, `BROKEN`, `SUSPICIOUS`, `NO REACHABLE SURFACE`, `INCONCLUSIVE` |
+| Ship | [release-captain](skills/release-captain/SKILL.md) | A version needs preparing, or tagging and publishing all the way to the registry | `READY TO TAG`, `RELEASED`, `PUBLISHED, AWAITING REGISTRY`, `BLOCKED`, `NOT READY` |
 | Hand off | [session-handoff](skills/session-handoff/SKILL.md) | You switch chats, models, tools, or people mid-task | A 40–80 line handoff note built from git and real check results |
 | All stages | [skillmaster-workflow](skills/skillmaster-workflow/SKILL.md) | You want a change taken end to end: understand, plan, implement, verify, review | `VERIFIED`, `PARTIALLY VERIFIED`, `ISSUES REMAIN`, `BLOCKED` |
 | Browser | [chrome-browser](skills/chrome-browser/SKILL.md) | You need to inspect or interact with a page in your running Chrome | Observations and the actions completed |
@@ -40,8 +42,8 @@ flowchart LR
   E -- findings --> C
 ```
 
-Bugs start at `bug-reproducer`, CI failures at `ci-failure-investigator`, and refactors at
-`safe-refactor`. The final report lists the checks that ran on the final code, the assumptions that
+Bugs start at `bug-reproducer`, CI failures at `ci-failure-investigator`, refactors at
+`safe-refactor`, and releases at `release-captain`, which runs `ci-parity-check` before the tag. The final report lists the checks that ran on the final code, the assumptions that
 remain unverified, and the residual risks. See [examples/](examples/) for complete walkthroughs.
 
 ## Install
@@ -109,6 +111,8 @@ Copy-Item -Recurse SkillMaster\skills\bug-reproducer "$HOME\.claude\skills\"
 |--------|-------|
 | All | `git`, and the project's own toolchain for running its tests |
 | `ci-failure-investigator` | GitHub CLI (`gh`) authenticated for the repository, or a pasted log |
+| `ci-parity-check` | What stands in for CI here: WSL or a Linux VM, Docker or Podman, side-by-side runtime versions |
+| `release-captain` | The project's release pipeline; `gh` to watch it, and the registry's CLI, such as `npm` |
 | `chrome-browser`, `action-tracker` | The [Chrome DevTools MCP server](https://github.com/ChromeDevTools/chrome-devtools-mcp) configured as `chrome-devtools`, and Chrome with remote debugging enabled |
 | Contributing | Python 3.9+ with PyYAML, and Node.js |
 
@@ -125,6 +129,8 @@ Copy-Item -Recurse SkillMaster\skills\bug-reproducer "$HOME\.claude\skills\"
 | "Split this 900-line controller without changing behavior." | Baseline and after-refactor comparison, step-by-step check results |
 | "Review my uncommitted changes." | P0–P3 findings with confidence labels and a verdict |
 | "Try to break my rate limiter with concurrent requests." | Executed attack tests and `Attack result: BROKEN`, `SURVIVED`, … |
+| "Tests pass on my Windows machine. Will they pass on the Linux CI before I tag?" | Each CI cell run locally from a clean export, flakes measured, and `CI parity: PARITY` or the first divergence |
+| "Release 2.4.0 and make sure npm actually gets it." | Versions everywhere, dated notes, the gate where the publish runs, the tag, the publish watched to the registry, `Release status: RELEASED` |
 | "I'm switching to a new chat. Write a handoff." | A handoff note with fresh/stale check status and an immediately executable next step |
 | "Use SkillMaster to add Google sign-in to my NestJS API, test it, and review it for security problems." | All stages run, ending in a `Delivery result:` report |
 
@@ -196,6 +202,7 @@ python -m scripts.run_eval --eval-set /path/to/SkillMaster/evals/bug-reproducer.
 | v0.2 | repo-context-builder, feature-planner, bug-reproducer | Done |
 | v0.3 | ai-code-verifier, test-gap-finder, safe-refactor, ci-failure-investigator, session-handoff | Done |
 | v0.4 | skillmaster-workflow and end-to-end examples | Done |
+| v0.5 | Tracker masking proven in Chrome, a shared mutation runner, sharper skills, ci-parity-check, release-captain | Ready, not released |
 | v1.0 | One-command install (Claude Code plugin and `gh skill`), trigger-eval runs, behavioral evaluations, tested compatibility across assistants | Install done; eval runs and cross-assistant testing open |
 
 Planned specialized skills: React and Next.js performance, accessibility, NestJS API contracts, and

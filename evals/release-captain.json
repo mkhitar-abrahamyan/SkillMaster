@@ -1,0 +1,42 @@
+[
+  {
+    "query": "Release 2.4.0: bump the versions, date the changelog, tag it, and make sure npm actually gets it",
+    "should_trigger": true
+  },
+  {
+    "query": "Get version 1.8 ready to ship, but don't publish anything yet",
+    "should_trigger": true
+  },
+  {
+    "query": "Is this ready to release? Check the versions, the changelog, and CI before I tag it",
+    "should_trigger": true
+  },
+  {
+    "query": "Publish the new version of my library to npm and watch the publish workflow until it's live",
+    "should_trigger": true
+  },
+  {
+    "query": "We're doing a major release, 3.0.0. Take it from version bump to the registry.",
+    "should_trigger": true
+  },
+  {
+    "query": "Why did the publish workflow fail on the last tag? Here's the run link.",
+    "should_trigger": false
+  },
+  {
+    "query": "Plan the features that should go into our next release",
+    "should_trigger": false
+  },
+  {
+    "query": "Bump lodash to its latest version in package.json",
+    "should_trigger": false
+  },
+  {
+    "query": "Write a blog post announcing our new release to customers",
+    "should_trigger": false
+  },
+  {
+    "query": "Will my change pass CI on Linux and every Node version before I push?",
+    "should_trigger": false
+  }
+]

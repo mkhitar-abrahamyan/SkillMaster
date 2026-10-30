@@ -30,6 +30,8 @@ Stage 2 depends on the task:
 - **CI failure:** `ci-failure-investigator`, then `bug-reproducer` for `CODE DEFECT` or
   `TEST DEFECT`; other classifications go to the user with the proposed correction.
 - **Refactor:** `safe-refactor`; gate `BEHAVIOR PRESERVED`. Stage 5 attack is optional.
+- **Release:** after the change is `VERIFIED`, `release-captain`, which runs `ci-parity-check` before
+  the tag; publishing still needs the user's explicit request.
 
 ## Rules
 
