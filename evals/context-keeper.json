@@ -1,0 +1,42 @@
+[
+  {
+    "query": "Save where we are on this task so I can continue it in Codex later",
+    "should_trigger": true
+  },
+  {
+    "query": "Pick up where the previous session left off in this repo, there's a .context folder",
+    "should_trigger": true
+  },
+  {
+    "query": "Set up automatic context saving for Claude Code and Codex in this project",
+    "should_trigger": true
+  },
+  {
+    "query": "I'll keep working on this with a local Ollama model. Record our progress so it can carry on from here",
+    "should_trigger": true
+  },
+  {
+    "query": "Continue the task from the last saved context record",
+    "should_trigger": true
+  },
+  {
+    "query": "Add a React context provider for the theme settings",
+    "should_trigger": false
+  },
+  {
+    "query": "Write me a status recap of this session to paste into the team chat",
+    "should_trigger": false
+  },
+  {
+    "query": "Explain how this repository is organized",
+    "should_trigger": false
+  },
+  {
+    "query": "Increase the context window of my local Ollama model",
+    "should_trigger": false
+  },
+  {
+    "query": "Summarize the last three commits",
+    "should_trigger": false
+  }
+]

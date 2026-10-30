@@ -1,6 +1,6 @@
 {
   "name": "skillmaster",
-  "description": "Agent skills for reliable AI coding: repository context, planning, bug reproduction, AI-code verification, test gaps, safe refactoring, CI diagnosis and parity, defect-first review, patch attacks, releases, Figma designs built and measured in the browser, session handoff, and an end-to-end verified workflow.",
+  "description": "Agent skills for reliable AI coding: repository context, planning, bug reproduction, AI-code verification, test gaps, safe refactoring, CI diagnosis and parity, defect-first review, patch attacks, releases, Figma designs built and measured in the browser, session handoff, context kept per conversation for the next chat or tool, and an end-to-end verified workflow.",
   "version": "0.5.1",
   "author": {
     "name": "Mkhitar Abrahamyan"
@@ -19,6 +19,8 @@
     "release",
     "mutation-testing",
     "figma",
-    "design-to-code"
+    "design-to-code",
+    "context",
+    "handoff"
   ]
 }

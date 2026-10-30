@@ -23,6 +23,7 @@ checks that actually ran from assumptions that were never verified.
 | Review | [adversarial-patch-attacker](skills/adversarial-patch-attacker/SKILL.md) | You explicitly want a patch attacked with reproduction tests | `SURVIVED`, `BROKEN`, `SUSPICIOUS`, `NO REACHABLE SURFACE`, `INCONCLUSIVE` |
 | Ship | [release-captain](skills/release-captain/SKILL.md) | A version needs preparing, or tagging and publishing all the way to the registry | `READY TO TAG`, `RELEASED`, `PUBLISHED, AWAITING REGISTRY`, `BLOCKED`, `NOT READY` |
 | Hand off | [session-handoff](skills/session-handoff/SKILL.md) | You switch chats, models, tools, or people mid-task | A 40–80 line handoff note built from git and real check results |
+| Hand off | [context-keeper](skills/context-keeper/SKILL.md) | You move one task between chats and tools, such as Claude Code, Codex, or a local Ollama model, and each should start where the last stopped | A record per conversation in a local `.context/` folder, a brief to resume from, and hooks that save and resume by themselves |
 | All stages | [skillmaster-workflow](skills/skillmaster-workflow/SKILL.md) | You want a change taken end to end: understand, plan, implement, verify, review | `VERIFIED`, `PARTIALLY VERIFIED`, `ISSUES REMAIN`, `BLOCKED` |
 | Build | [figma-implementer](skills/figma-implementer/SKILL.md) | A Figma design needs building and checking in the running app; a Figma tab and a localhost tab are all it needs | `MATCHES`, `MATCHES WITH DEVIATIONS`, `MISMATCHES`, `BLOCKED` |
 | Browser | [chrome-browser](skills/chrome-browser/SKILL.md) | You need to inspect or interact with a page in your running Chrome | Observations and the actions completed |
@@ -45,7 +46,8 @@ flowchart LR
 
 Bugs start at `bug-reproducer`, CI failures at `ci-failure-investigator`, refactors at
 `safe-refactor`, screens from a Figma design at `figma-implementer`, and releases at
-`release-captain`, which runs `ci-parity-check` before the tag. A change to a page is also checked
+`release-captain`, which runs `ci-parity-check` before the tag. Work that moves between chats or
+tools keeps its state in `context-keeper`'s records. A change to a page is also checked
 in the running app, and one headed for CI on another platform is run there first. The final report
 lists the checks that ran on the final code, the assumptions that remain unverified, and the
 residual risks. See [examples/](examples/) for complete walkthroughs.
@@ -118,6 +120,7 @@ Copy-Item -Recurse SkillMaster\skills\bug-reproducer "$HOME\.claude\skills\"
 | `ci-parity-check` | What stands in for CI here: WSL or a Linux VM, Docker or Podman, side-by-side runtime versions |
 | `release-captain` | The project's release pipeline; `gh` to watch it, and the registry's CLI, such as `npm` |
 | `figma-implementer` | A Figma MCP server, the Chrome DevTools MCP server as for `chrome-browser`, and Node.js for its scripts |
+| `context-keeper` | Node.js 18 or later and git; Claude Code or Codex to save and resume by themselves |
 | `chrome-browser`, `action-tracker` | The [Chrome DevTools MCP server](https://github.com/ChromeDevTools/chrome-devtools-mcp) configured as `chrome-devtools`, and Chrome with remote debugging enabled |
 | Contributing | Python 3.9+ with PyYAML, and Node.js |
 
@@ -137,6 +140,7 @@ Copy-Item -Recurse SkillMaster\skills\bug-reproducer "$HOME\.claude\skills\"
 | "Tests pass on my Windows machine. Will they pass on the Linux CI before I tag?" | Each CI cell run locally from a clean export, flakes measured, and `CI parity: PARITY` or the first divergence |
 | "Make my localhost tab match the Figma tab I have open." | A ledger of every design detail, the build with the project's components and tokens, measurements and a pixel comparison per state and breakpoint, `Design match: MATCHES` or the deviations |
 | "Release 2.4.0 and make sure npm actually gets it." | Versions everywhere, dated notes, the gate where the publish runs, the tag, the publish watched to the registry, `Release status: RELEASED` |
+| "Save where we are so I can continue in Codex, and make it happen by itself from now on." | This conversation's record in `.context/`, hooks for Claude Code and Codex, and a brief the next session starts from |
 | "I'm switching to a new chat. Write a handoff." | A handoff note with fresh/stale check status and an immediately executable next step |
 | "Use SkillMaster to add Google sign-in to my NestJS API, test it, and review it for security problems." | All stages run, ending in a `Delivery result:` report |
 
@@ -160,6 +164,9 @@ Copy-Item -Recurse SkillMaster\skills\bug-reproducer "$HOME\.claude\skills\"
   agent acts on it. Between the actions they log failed requests and page errors, and they keep
   the recording in the tab's session storage, so it continues after a reload once the script runs
   again. `.off()` drops it.
+- `context-keeper`'s `.context/` folder stays on your machine: it is created with a `.gitignore`
+  of its own, a record that holds a secret is not saved, and the hooks it wires live in each tool's
+  local settings, kept out of git. A record is treated as notes to check, not as instructions.
 - Both tracker overlays mask what is typed into sensitive fields, because the overlay appears in
   screenshots: passwords, payment fields, one-time codes, API keys and tokens, PINs, and bank and
   government IDs show as `•••` whatever their length, and their keystrokes are not logged. A field
@@ -181,7 +188,7 @@ scripts/blocks/             code embedded in self-contained scripts, such as the
 evals/<name>.json           trigger evals: prompts that should and should not activate each skill
 examples/                   end-to-end walkthroughs
 tools/validate_skills.py    the CI validator
-tools/test_*.mjs            tests of the bundled scripts: the trackers' masking and recording, the mutation runner, and figma-implementer's measuring and pixel comparison
+tools/test_*.mjs            tests of the bundled scripts: the trackers' masking and recording, context-keeper's records and hooks, the mutation runner, and figma-implementer's measuring and pixel comparison
 .claude-plugin/             Claude Code plugin and marketplace manifests
 ```
 
@@ -215,6 +222,7 @@ python -m scripts.run_eval --eval-set /path/to/SkillMaster/evals/bug-reproducer.
 | v0.3 | ai-code-verifier, test-gap-finder, safe-refactor, ci-failure-investigator, session-handoff | Done |
 | v0.4 | skillmaster-workflow and end-to-end examples | Done |
 | v0.5 | Tracker masking proven in Chrome, tracker recordings as Playwright tests, a shared mutation runner, sharper skills, ci-parity-check, release-captain, figma-implementer | Done |
+| v0.6 | context-keeper: a record per conversation in `.context/`, resumed in any chat or tool, saved and resumed by Claude Code and Codex hooks | Ready, not released |
 | v1.0 | One-command install (Claude Code plugin and `gh skill`), trigger-eval runs, behavioral evaluations, tested compatibility across assistants | Install done; eval runs and cross-assistant testing open |
 
 Planned specialized skills: React and Next.js performance, accessibility, NestJS API contracts, and

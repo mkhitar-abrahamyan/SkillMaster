@@ -1,6 +1,6 @@
 ---
 name: session-handoff
-description: Use when ending or pausing a work session, switching AI models, tools, or chats, running low on context, or when the user asks for a handoff, status summary, progress notes, or a recap that another person or agent will pick up.
+description: Use when ending or pausing a work session, switching AI models, tools, or chats, running low on context, or when the user asks for a handoff, status summary, progress notes, or a recap that another person or agent will pick up. Writes the note in the conversation; for records kept in the project's .context/ folder, which the next chat or tool resumes from, use context-keeper.
 license: MIT
 ---
 

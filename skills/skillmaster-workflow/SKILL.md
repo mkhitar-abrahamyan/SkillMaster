@@ -21,7 +21,7 @@ the essentials in the table. Meet each gate before moving on.
 | 3 | Implement | — | Follow the plan step by step and run each `verify:` line | Every step's verification passed |
 | 4 | Verify | `ai-code-verifier`, `test-gap-finder` | Confirm your own imports, APIs, and dependencies exist in installed versions; add a test per acceptance criterion and prove each can fail | `VERIFIED`, and `GAPS CLOSED` or `ADEQUATE` |
 | 5 | Review and attack | `ruthless-code-reviewer`, `adversarial-patch-attacker` | Defect-first review of the full diff; targeted attack tests on auth, data, and concurrency paths | No P0/P1; each P2 fixed or justified |
-| 6 | Hand off | `session-handoff` | The final report below | — |
+| 6 | Hand off | `session-handoff`; `context-keeper` when another chat or tool continues the work | The final report below | — |
 
 Stage 2 depends on the task:
 
