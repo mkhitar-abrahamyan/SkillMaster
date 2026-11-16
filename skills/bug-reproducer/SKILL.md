@@ -9,6 +9,11 @@ license: MIT
 A fix that was never seen failing is a guess. Reproduce first, then find the cause, then fix and
 show the reproduction turn from red to green.
 
+Use the same evidence standard in every update and in the final answer, including a quick reply:
+separate what was directly observed, what a source documents, and what is inferred. Do not turn a
+plausible explanation or an external report into a confirmed cause. If the evidence is incomplete,
+say so briefly and identify what would settle it.
+
 ## Boundary and safety
 
 - Apply a fix only when the user asked for one. For "investigate", "reproduce", or "why does…"
@@ -40,20 +45,27 @@ show the reproduction turn from red to green.
    versions, configuration, data shape and size, locale and timezone, concurrency and timing,
    cache state, permissions. Use `git bisect` when a known-good revision exists. After a bounded
    set of attempts, stop and report what was tried instead of shipping an unconfirmed fix.
-4. **Find the root cause.** Trace backward from the failing assertion through data and control
+4. **Inspect the application's path before assigning cause.** Trace the failing input through the
+   app's event handler, validation, and relevant dependencies to the reported outcome. For browser
+   issues, inspect what the browser actually delivers and how the app and its libraries handle it.
+   External reports, browser differences, or a plausible platform limitation are leads, not proof
+   of this application's root cause. State a cause as verified only when a reproduction or a
+   discriminating observation supports it; otherwise label it likely or inconclusive and say what
+   evidence is missing. Keep workarounds separate from root-cause claims.
+5. **Find the root cause.** Trace backward from the failing assertion through data and control
    flow to where the wrong value or state originates. Test one hypothesis at a time with an
    observation that distinguishes it (log, debugger, assertion). Separate the root cause from the
    symptom and from contributing factors. Search for the same faulty pattern elsewhere.
-5. **Fix minimally** at the root cause, with no unrelated refactoring or cleanup. When the right fix
+6. **Fix minimally** at the root cause, with no unrelated refactoring or cleanup. When the right fix
    is large or changes a contract, stop and present options.
-6. **Verify red to green.** Show the reproduction failing before the fix and passing after it. For
+7. **Verify red to green.** Show the reproduction failing before the fix and passing after it. For
    an intermittent bug, red to green is a pair of rates: failures in N runs before, none in at
    least N after, with N large enough that no failures is not luck (at a 1-in-10 rate, 50 clean
    runs leave about a 0.5% chance).
    Run the affected module's tests, then the broader suite the project uses for that area. When a
    related test fails, run it on the unfixed revision to tell a new regression from a pre-existing
    failure.
-7. **Keep the guard.** Turn the reproduction into a regression test named for the behavior.
+8. **Keep the guard.** Turn the reproduction into a regression test named for the behavior.
 
 ## Output
 
