@@ -4,6 +4,10 @@
     "should_trigger": true
   },
   {
+    "query": "Can you do a quick review of this small diff?",
+    "should_trigger": true
+  },
+  {
     "query": "Do a thorough code review of PR #87 against main, focusing on regressions and security",
     "should_trigger": true
   },

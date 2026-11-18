@@ -23,7 +23,7 @@ checks that actually ran from assumptions that were never verified.
 | Review | [adversarial-patch-attacker](skills/adversarial-patch-attacker/SKILL.md) | You explicitly want a patch attacked with reproduction tests | `SURVIVED`, `BROKEN`, `SUSPICIOUS`, `NO REACHABLE SURFACE`, `INCONCLUSIVE` |
 | Ship | [release-captain](skills/release-captain/SKILL.md) | A version needs preparing, or tagging and publishing all the way to the registry | `READY TO TAG`, `RELEASED`, `PUBLISHED, AWAITING REGISTRY`, `BLOCKED`, `NOT READY` |
 | Hand off | [session-handoff](skills/session-handoff/SKILL.md) | You switch chats, models, tools, or people mid-task | A 40–80 line handoff note built from git and real check results |
-| Hand off | [context-keeper](skills/context-keeper/SKILL.md) | You move one task between chats and tools, such as Claude Code, Codex, or a local Ollama model, and each should start where the last stopped | A record per conversation in a local `.context/` folder, a brief to resume from, and hooks that save and resume by themselves |
+| Hand off | [context-keeper](skills/context-keeper/SKILL.md) | You move one task between chats and tools, such as Claude Code, Codex, or a local Ollama model, and each should start where the last stopped | A record per chat conversation in a local per-project context folder, a brief to resume from, and optional hooks that save and resume by themselves |
 | All stages | [skillmaster-workflow](skills/skillmaster-workflow/SKILL.md) | You want a change taken end to end: understand, plan, implement, verify, review | `VERIFIED`, `PARTIALLY VERIFIED`, `ISSUES REMAIN`, `BLOCKED` |
 | Build | [figma-implementer](skills/figma-implementer/SKILL.md) | A Figma design needs building and checking in the running app; a Figma tab and a localhost tab are all it needs | `MATCHES`, `MATCHES WITH DEVIATIONS`, `MISMATCHES`, `BLOCKED` |
 | Browser | [chrome-browser](skills/chrome-browser/SKILL.md) | You need to inspect or interact with a page in your running Chrome | Observations and the actions completed |
@@ -150,7 +150,7 @@ Copy-Item -Recurse SkillMaster\skills\bug-reproducer "$HOME\.claude\skills\"
 | "Cursor wrote this module and says the tests pass. Verify it." | A claims table (`verified` / `contradicted` / `unverified`) and checks for invented packages and APIs |
 | "Is my discount change adequately tested? Add what's missing." | A behavior map, plus new tests each proven to fail when its behavior breaks |
 | "Split this 900-line controller without changing behavior." | Baseline and after-refactor comparison, step-by-step check results |
-| "Review my uncommitted changes." | P0–P3 findings with confidence labels and a verdict |
+| "Review my uncommitted changes." | P0–P3 findings with per-finding verification statuses and a verdict |
 | "Try to break my rate limiter with concurrent requests." | Executed attack tests and `Attack result: BROKEN`, `SURVIVED`, … |
 | "Tests pass on my Windows machine. Will they pass on the Linux CI before I tag?" | Each CI cell run locally from a clean export, flakes measured, and `CI parity: PARITY` or the first divergence |
 | "Make my localhost tab match the Figma tab I have open." | A ledger of every design detail, the build with the project's components and tokens, measurements and a pixel comparison per state and breakpoint, `Design match: MATCHES` or the deviations |

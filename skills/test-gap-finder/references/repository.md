@@ -56,7 +56,7 @@ failed check as a defect of the change only when evidence ties the failure to it
 
 ## Priorities
 
-Every skill that links here uses the same labels. Priority expresses urgency; confidence
+Every skill that links here uses the same labels. Priority expresses urgency; verification status
 expresses evidence.
 
 - **P0** — urgent, universal release/operation blocker, such as an unavoidable outage, security

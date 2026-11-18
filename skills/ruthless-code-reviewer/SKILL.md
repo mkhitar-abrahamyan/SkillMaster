@@ -32,7 +32,7 @@ commits, push branches, or post review comments.
    execution, call-site inspection, history, or authoritative framework documentation as
    appropriate. Continue through the whole diff after finding an issue.
 
-## Finding threshold and confidence
+## Finding threshold and verification status
 
 Report an issue only when all of these are true:
 
@@ -46,19 +46,27 @@ Do not report speculative concerns, pre-existing issues, style nits, or delibera
 as bugs unless a concrete compatibility, contract, safety, or other material failure follows from
 the choice. Do not invent a finding to appear thorough.
 
-Every finding must include one confidence label:
+Every finding must include an explicit **Verification status** label. Never omit it or imply that a
+finding is verified merely by reporting it:
 
-- **verified** — established directly by the code, call path, test, runtime result, or other
-  gathered evidence.
-- **likely** — supported by a concrete code-based failure scenario, but not fully reproduced or
+- **VERIFIED** — the reported failure is established directly by the code, call path, test,
+  runtime result, or other gathered evidence.
+- **LIKELY** — supported by a concrete code-based failure scenario, but not fully reproduced or
   verified in the available environment.
-- **unverified** — a concrete failure scenario tied to changed code and a reachable caller, but
+- **UNVERIFIED** — a concrete failure scenario tied to changed code and a reachable caller, but
   dependent on an unresolved environmental or runtime assumption. Name that assumption, the
   evidence that would settle it, and why that evidence was unavailable.
 
+Use the exact label in every finding and state the evidence that supports it. A review's checks
+section or overall verdict does not replace per-finding verification status. Do not call a finding
+verified when only its changed code or a plausible path was inspected; the failure itself must be
+demonstrated by evidence. Do not suppress a meaningful candidate only because it could not be
+fully reproduced: use `LIKELY` or `UNVERIFIED` as appropriate and state the remaining gap.
+
 Do not suppress a meaningful race, boundary failure, or other plausible defect solely because it
-cannot be reproduced in the available sandbox. Label it `unverified` and distinguish the
-hypothesis from established facts. Missing verification alone is not a finding. An `unverified`
+cannot be reproduced in the available sandbox. Label it `LIKELY` or `UNVERIFIED` according to the
+evidence and distinguish the hypothesis from established facts. Missing verification alone is not a
+finding. An `UNVERIFIED`
 finding may raise the verdict to `CHANGES REQUIRED`, but never to `BLOCK` or P0.
 
 ## Priority and verdict
@@ -74,6 +82,8 @@ whether the change meets required behavior:
 - Otherwise, any verified P2 defect that violates required behavior or a supported contract ->
   `CHANGES REQUIRED`. Do not describe a demonstrated correctness failure as a minor issue merely
   because it has normal priority.
+- Otherwise, a likely or unverified P2 finding whose concrete potential impact warrants a fix
+  before approval -> `CHANGES REQUIRED`; explain the remaining uncertainty.
 - Otherwise, if missing target content or evidence prevents a material part of the scoped review
   from being assessed -> `INCONCLUSIVE`. Preserve any findings already established.
 - Otherwise, only non-blocking P2/P3 improvements remain -> `APPROVE WITH MINOR ISSUES`. Briefly
@@ -91,7 +101,7 @@ Lead with findings, ordered by priority. Use this compact format for each:
 
 **Location:** file and the smallest changed line range that explains the defect, preferably 1–5 lines.
 
-**Confidence:** `verified` | `likely` | `unverified`
+**Verification status:** `VERIFIED` | `LIKELY` | `UNVERIFIED`
 
 One concise paragraph explaining the triggering input/state/sequence, the cause, and the concrete
 impact. Cite the supporting test, caller, or code path. Include the unresolved assumption for an

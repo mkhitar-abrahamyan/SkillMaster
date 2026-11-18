@@ -11,7 +11,7 @@
  */
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, unlinkSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, unlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -411,6 +411,124 @@ try {
   assert.match(out.stdout, /^# Context: open$/m);
   assert.doesNotMatch(out.stdout, /Other open tasks:.*complete/, 'history does not revive the completed task');
   console.log('ok - completed successor records keep their predecessors out of open-task selection');
+
+  // ── --context-dir: one shared folder, a folder per project ──────────
+  const sharedBase = path.join(work, 'workspace', '.ai', '.context');
+  const alpha = project(path.join('workspace', 'alpha'));
+  const beta = project(path.join('workspace', 'beta'));
+  const sharedRecords = (name) => readdirSync(path.join(sharedBase, name, 'conversations')).filter((file) => file.endsWith('.md')).sort();
+  const withContextDir = (args, base) => {
+    const separator = args.indexOf('--');
+    return separator === -1
+      ? [...args, '--context-dir', base]
+      : [...args.slice(0, separator), '--context-dir', base, ...args.slice(separator)];
+  };
+  const atBase = (dir, args, input) => run(dir, withContextDir(args, sharedBase), input);
+  out = atBase(alpha, ['start', '--task', 'alpha work', '--agent', 'codex', '--session', 'alpha-1']);
+  assert.equal(out.status, 0, out.stderr);
+  const alphaRecord = recordOf(out.stdout);
+  assert.ok(existsSync(path.join(alpha, alphaRecord)), `the record path resolves from the project:\n${out.stdout}`);
+  assert.match(out.stdout, new RegExp(`--context-dir "${pattern(sharedBase.split(path.sep).join('/'))}"`), `the next command keeps the folder:\n${out.stdout}`);
+  out = atBase(beta, ['start', '--task', 'beta work', '--agent', 'claude-code', '--session', 'beta-1']);
+  assert.equal(out.status, 0, out.stderr);
+  assert.deepEqual(sharedRecords('alpha').length, 1, 'alpha has its own folder');
+  assert.deepEqual(sharedRecords('beta').length, 1, 'beta has its own folder');
+  assert.ok(!existsSync(path.join(alpha, '.context')) && !existsSync(path.join(beta, '.context')), 'no project gets a .context/ of its own');
+  assert.equal(read(path.join(sharedBase, 'alpha', 'project-root.txt')).trim(), realpathSync.native(alpha), 'each folder names the project it belongs to');
+  assert.equal(gitOut(alpha, 'status', '--porcelain', '--untracked-files=all'), '', 'the project sees no new files');
+  console.log('ok - --context-dir keeps each project in a folder of its own under the shared one');
+
+  // Sessions stay with their project: the same session id in another project is another record.
+  out = atBase(beta, ['start', '--task', 'beta work', '--agent', 'codex', '--session', 'alpha-1']);
+  assert.equal(out.status, 0, out.stderr);
+  assert.equal(sharedRecords('beta').length, 2, 'a session in beta is not merged with alpha\'s');
+  out = atBase(alpha, ['start', '--task', 'alpha work', '--agent', 'codex', '--session', 'alpha-1']);
+  assert.match(out.stdout, new RegExp(`This conversation's record: ${pattern(alphaRecord)}`), 'a session started again reuses its record');
+  assert.equal(sharedRecords('alpha').length, 1, 'one record per exact session');
+  assert.equal(atBase(alpha, ['note', 'done', 'Alpha only', '--session', 'alpha-1']).status, 0);
+  assert.match(read(path.join(alpha, alphaRecord)), /Alpha only/);
+  for (const file of sharedRecords('beta')) assert.doesNotMatch(read(path.join(sharedBase, 'beta', 'conversations', file)), /Alpha only/, 'a note stays in its project');
+  const betaFile = path.join(sharedBase, 'beta', 'conversations', sharedRecords('beta')[0]);
+  assert.equal(atBase(alpha, ['save', '--file', betaFile]).status, 1, 'a sibling project\'s record is not this project\'s to save');
+  assert.match(atBase(alpha, ['list']).stdout, /alpha-work/);
+  assert.doesNotMatch(atBase(alpha, ['list']).stdout, /beta-work/, 'list shows this project only');
+  assert.match(run(alpha, ['resume']).stdout, /No \.context\/ here yet/, 'without the flag, the default folder is unchanged and empty');
+  console.log('ok - --context-dir sessions, notes, and records stay with their own project');
+
+  // A relative base resolves once, from the project root, whatever folder it runs from.
+  const gamma = project(path.join('workspace', 'gamma'));
+  mkdirSync(path.join(gamma, 'src', 'deep'), { recursive: true });
+  out = run(path.join(gamma, 'src', 'deep'), ['start', '--task', 'relative', '--agent', 'codex', '--context-dir', '../.ai/.context']);
+  assert.equal(out.status, 0, out.stderr);
+  assert.equal(sharedRecords('gamma').length, 1, 'the relative base is the shared folder beside the project');
+  assert.ok(!existsSync(path.join(gamma, 'src', '.ai')) && !existsSync(path.join(work, 'workspace', 'gamma', '.ai')), 'not resolved from the cwd');
+  assert.match(run(gamma, ['list', '--context-dir', path.join('..', '.ai', '.context')]).stdout, /relative/, 'and from the root it reaches the same records');
+  for (const args of [['start', '--context-dir'], ['start', '--context-dir', ''], ['list', '--context-dir', '--full']]) {
+    out = run(gamma, args);
+    assert.equal(out.status, 1, `a missing --context-dir value is a usage error: ${args.join(' ')}`);
+    assert.match(out.stderr, /--context-dir needs a folder/);
+  }
+  out = run(gamma, ['hook', 'codex', '--context-dir'], JSON.stringify({ hook_event_name: 'Stop', session_id: 'x', cwd: gamma }));
+  assert.equal(out.status, 0, 'a hook with a bad --context-dir still exits 0');
+  assert.equal(out.stdout.trim(), '{}', 'and still answers Codex');
+  console.log('ok - a relative --context-dir resolves once from the project root; a missing value is refused');
+
+  // Two projects with one folder name cannot share a folder.
+  const twin = project(path.join('elsewhere', 'alpha'));
+  out = atBase(twin, ['start', '--task', 'twin', '--agent', 'codex']);
+  assert.equal(out.status, 1, 'a second project named alpha is refused');
+  assert.match(out.stderr, /another project with the same folder name/);
+  assert.equal(atBase(twin, ['list']).status, 1, 'and cannot read alpha\'s records');
+  out = atBase(twin, ['note', 'done', 'Wrong project', '--file', path.join(alpha, alphaRecord)]);
+  assert.equal(out.status, 1, 'an explicit file cannot bypass the project owner check');
+  assert.doesNotMatch(read(path.join(alpha, alphaRecord)), /Wrong project/, 'the other project record is untouched');
+  assert.equal(sharedRecords('alpha').length, 1, 'alpha\'s records are untouched');
+  out = atBase(twin, ['hook', 'claude'], JSON.stringify({ hook_event_name: 'Stop', session_id: 'twin', cwd: twin }));
+  assert.equal(out.status, 0, 'a hook in the colliding project exits 0');
+  assert.equal(sharedRecords('alpha').length, 1, 'and writes nothing into alpha\'s folder');
+  console.log('ok - projects with the same folder name are refused rather than merged');
+
+  // The hooks keep --context-dir, run as written, and write into the project's own folder.
+  out = atBase(alpha, ['wire', 'all']);
+  assert.equal(out.status, 0, out.stderr);
+  const commandsIn = (file) => Object.values(JSON.parse(read(path.join(alpha, file))).hooks).flat().flatMap((group) => group.hooks).map((entry) => entry.command);
+  for (const file of ['.claude/settings.local.json', '.codex/hooks.json']) {
+    for (const command of commandsIn(file)) assert.ok(command.endsWith(`--context-dir "${sharedBase.split(path.sep).join('/')}"`), `${file} keeps the absolute folder: ${command}`);
+  }
+  assert.equal(atBase(alpha, ['doctor']).status, 0, `doctor agrees with the wired folder:\n${atBase(alpha, ['doctor']).stdout}`);
+  out = run(alpha, ['doctor', '--context-dir', path.join(work, 'other-base')]);
+  assert.equal(out.status, 1, 'doctor with another folder finds no records there');
+  const wired = commandsIn('.claude/settings.local.json')[0];
+  const runHook = (event, session) => spawnSync(wired, { cwd: path.join(work), shell: true, encoding: 'utf8', env, input: JSON.stringify({ hook_event_name: event, session_id: session, cwd: alpha }) });
+  out = runHook('SessionStart', 'alpha-hooked');
+  assert.equal(out.status, 0, out.stderr);
+  assert.match(out.stdout, /--context-dir/, `the session start names the same folder:\n${out.stdout}`);
+  writeFileSync(path.join(alpha, 'app.js'), 'export const add = (a, b) => b + a;\n');
+  out = runHook('Stop', 'alpha-hooked');
+  assert.equal(out.status, 0, out.stderr);
+  assert.equal(sharedRecords('alpha').length, 2, 'the hook writes the changed conversation into alpha\'s folder');
+  assert.equal(sharedRecords('beta').length, 2, 'and nothing into beta\'s');
+  assert.equal(atBase(alpha, ['unwire', 'all']).status, 0);
+  assert.doesNotMatch(read(path.join(alpha, '.claude/settings.local.json')), /ctx\.mjs" hook/, 'unwire removes them');
+  console.log('ok - wire keeps --context-dir in the hooks, which run and stay in their project');
+
+  // A shared folder inside the project is not a project change, and checks stay fresh across saves.
+  const nested = project(path.join('workspace', 'inner'));
+  const innerAt = (args) => run(nested, withContextDir(args, '.ai/.context'));
+  const innerRecord = recordOf(innerAt(['start', '--task', 'fresh', '--agent', 'codex', '--session', 'inner-1']).stdout);
+  assert.ok(innerRecord?.startsWith('.ai/.context/inner/conversations/'), `the record is in the inner folder: ${innerRecord}`);
+  assert.equal(innerAt(['check', '--session', 'inner-1', '--', process.execPath, '-e', 'process.exit(0)']).status, 0);
+  assert.equal(innerAt(['note', 'next', 'Keep going', '--session', 'inner-1']).status, 0);
+  assert.equal(innerAt(['save', '--session', 'inner-1']).status, 0);
+  text = read(path.join(nested, innerRecord));
+  assert.ok(text.includes('- Uncommitted changes: none.'), `the records are not project changes:\n${text}`);
+  assert.match(text, /passed, fresh: /, `saving records does not make a check stale:\n${text}`);
+  writeFileSync(path.join(nested, '.ai', 'stray.txt'), 'project file beside the shared folder\n');
+  assert.equal(innerAt(['save', '--session', 'inner-1']).status, 0);
+  text = read(path.join(nested, innerRecord));
+  assert.ok(text.includes('.ai/stray.txt'), `files beside the shared folder are still project changes:\n${text}`);
+  assert.match(text, /passed, stale, the code changed since: /, 'and still make checks stale');
+  console.log('ok - a --context-dir inside the project is left out of changes and freshness, nothing more');
 } finally {
   rmSync(work, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 }

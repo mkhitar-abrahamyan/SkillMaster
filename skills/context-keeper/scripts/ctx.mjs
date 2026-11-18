@@ -19,6 +19,9 @@
  *   node ctx.mjs wire <claude|codex|all>       resume and save by themselves, through hooks
  *   node ctx.mjs unwire <claude|codex|all>
  *   node ctx.mjs hook <claude|codex>           what those hooks run; the event arrives on stdin
+ *   Every command also accepts --context-dir <path>: keep the records in <path>/<project>/ instead
+ *   of the project's .context/. A relative path resolves from the project root; wire keeps it in
+ *   the hooks it writes.
  *
  * Exit codes: 0 done; 1 a usage error or nothing to act on; 2 a record holds what looks like a
  * secret and was not saved (save --mask replaces it with •••). check exits with its command's code.
@@ -32,6 +35,7 @@ import {
   mkdirSync,
   readFileSync,
   readdirSync,
+  realpathSync,
   rmSync,
   statSync,
   writeFileSync,
@@ -41,7 +45,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 // Raised when the record format or the script's behavior changes: init replaces an older copy.
-const VERSION = 3;
+const VERSION = 5;
 const SELF = fileURLToPath(import.meta.url);
 const DIR = '.context';
 const SECTIONS = ['Goal', 'Done', 'Next actions', 'Decisions', 'Dead ends', 'Open questions', 'Notes'];
@@ -133,8 +137,28 @@ const sessionKey = (id) => String(id ?? '').replace(/[^A-Za-z0-9_-]/g, '').slice
 const detectAgent = () =>
   process.env.CTX_AGENT ||
   (process.env.CLAUDECODE ? 'claude-code' : Object.keys(process.env).some((key) => key.startsWith('CODEX_')) ? 'codex' : 'agent');
+// --context-dir: records kept in <base>/<project>/ instead of <project>/.context/. A relative base
+// resolves from the project root.
+let CONTEXT_BASE;
+// Fixed by the first findRoot, so a relative base resolves once, from the project root, however
+// many folders the search for that root looked at.
+let RESOLVED_BASE;
+const contextBase = (root) => (CONTEXT_BASE ? (RESOLVED_BASE ?? path.resolve(root, CONTEXT_BASE)) : undefined);
+// Two --context-dir values, either absent for the default .context/, that reach the same folder.
+const sameBase = (a, b) => (!a || !b ? !a && !b : samePath(path.resolve(a), path.resolve(b)));
+const projectName = (root) => path.basename(path.resolve(root)).replace(/[<>:"/\\|?*\u0000-\u001f]/g, '-') || 'project';
+const slash = (file) => file.split(path.sep).join('/');
+// The command a person or tool runs next, with the same --context-dir so it reaches the same records.
+function invoke(root, command, script) {
+  if (!CONTEXT_BASE) return `${script ? `node "${slash(script)}"` : `node ${DIR}/ctx.mjs`} ${command}`;
+  return `node "${slash(script ?? paths(root).script)}" ${command} --context-dir "${slash(contextBase(root))}"`;
+}
+// The folder as messages name it: .context/ by default, else where it is from the project.
+const shown = (root) => (CONTEXT_BASE ? `${rel(root, paths(root).dir)}/` : `${DIR}/`);
+// A record path for a command line: quoted only when it would otherwise split.
+const fileArg = (root, file) => (/\s/.test(rel(root, file)) ? `"${rel(root, file)}"` : rel(root, file));
 function paths(root) {
-  const dir = path.join(root, DIR);
+  const dir = CONTEXT_BASE ? path.join(contextBase(root), projectName(root)) : path.join(root, DIR);
   return {
     dir,
     conversations: path.join(dir, 'conversations'),
@@ -145,7 +169,24 @@ function paths(root) {
     readme: path.join(dir, 'README.md'),
     script: path.join(dir, 'ctx.mjs'),
     errors: path.join(dir, 'hook-errors.log'),
+    owner: path.join(dir, 'project-root.txt'),
   };
+}
+class UsageError extends Error {}
+// In a shared --context-dir, the project whose records a folder holds, when it is not this one.
+function foreignOwner(root) {
+  if (!CONTEXT_BASE) return undefined;
+  let owner;
+  try {
+    owner = readFileSync(paths(root).owner, 'utf8').trim();
+  } catch {
+    return undefined;
+  }
+  return owner && !samePath(path.resolve(owner), path.resolve(root)) ? owner : undefined;
+}
+function guardOwner(root) {
+  const owner = foreignOwner(root);
+  if (owner) throw new UsageError(`${paths(root).dir} holds the records of ${owner}, another project with the same folder name: use another --context-dir.`);
 }
 const rel = (root, file) => path.relative(root, file).split(path.sep).join('/');
 // Windows paths differ only in case as often as not, such as a drive letter.
@@ -154,13 +195,29 @@ const samePath = (a, b) => (process.platform === 'win32' ? a.toLowerCase() === b
 // and never the home folder, whose .context/ would take in every project under it; else the work
 // tree's top, else here.
 function findRoot(from = process.cwd()) {
-  const start = path.resolve(from);
+  const root = searchRoot(from);
+  if (CONTEXT_BASE && !RESOLVED_BASE) RESOLVED_BASE = path.resolve(root, CONTEXT_BASE);
+  return root;
+}
+// The long, real name: on Windows a short 8.3 name such as MKHITA~1 never equals what git reports.
+const real = (dir) => {
+  try {
+    return realpathSync.native(dir);
+  } catch {
+    return path.resolve(dir);
+  }
+};
+function searchRoot(from) {
+  const start = real(path.resolve(from));
   const top = git(['rev-parse', '--show-toplevel'], start)?.trim();
-  const boundary = top ? path.resolve(top) : undefined;
-  const home = path.resolve(homedir());
+  const boundary = top ? real(path.resolve(top)) : undefined;
+  // Records kept elsewhere belong to the whole work tree: a subfolder named like another project
+  // in the shared folder must not take its records.
+  if (CONTEXT_BASE && boundary) return boundary;
+  const home = real(path.resolve(homedir()));
   for (let dir = start; ; ) {
     if (samePath(dir, home) && !samePath(dir, start)) break;
-    if (existsSync(path.join(dir, DIR, 'conversations'))) return dir;
+    if (existsSync(paths(dir).conversations)) return dir;
     if (boundary && samePath(dir, boundary)) break;
     const up = path.dirname(dir);
     if (up === dir) break;
@@ -178,19 +235,26 @@ function git(args, cwd, encoding = 'utf8') {
     return null;
   }
 }
-// Everything but .context/ itself, which changes with every save.
-const OUTSIDE = ['--', '.', `:(exclude)${DIR}`];
+// Everything but .context/ itself, which changes with every save, and a --context-dir inside the
+// project, with every project's records in it.
+function outside(root) {
+  const spec = ['--', '.', `:(exclude)${DIR}`];
+  const base = contextBase(root);
+  const inside = base && path.relative(root, base);
+  if (inside && !inside.startsWith('..') && !path.isAbsolute(inside)) spec.push(`:(exclude,literal)${slash(inside)}`);
+  return spec;
+}
 // A hash of the code as it is: HEAD, every tracked change, and every untracked file's content. A
 // check is fresh while it matches, so any edit, committed or not, makes earlier results stale.
 function fingerprint(root, head) {
   const hash = createHash('sha256');
   hash.update(head || 'no commits');
-  if (head) hash.update(git(['diff', 'HEAD', '--binary', ...OUTSIDE], root, 'buffer') ?? '');
+  if (head) hash.update(git(['diff', 'HEAD', '--binary', ...outside(root)], root, 'buffer') ?? '');
   else {
-    hash.update(git(['diff', '--cached', '--binary', ...OUTSIDE], root, 'buffer') ?? '');
-    hash.update(git(['diff', '--binary', ...OUTSIDE], root, 'buffer') ?? '');
+    hash.update(git(['diff', '--cached', '--binary', ...outside(root)], root, 'buffer') ?? '');
+    hash.update(git(['diff', '--binary', ...outside(root)], root, 'buffer') ?? '');
   }
-  const untracked = (git(['ls-files', '--others', '--exclude-standard', '-z', ...OUTSIDE], root) ?? '').split('\0').filter(Boolean).sort();
+  const untracked = (git(['ls-files', '--others', '--exclude-standard', '-z', ...outside(root)], root) ?? '').split('\0').filter(Boolean).sort();
   for (const file of untracked) {
     hash.update(`\0${file}\0`);
     try {
@@ -210,8 +274,8 @@ function workspace(root) {
     head,
     branch: git(['branch', '--show-current'], root)?.trim() || (head ? 'detached' : ''),
     subject: head ? (git(['log', '-1', '--format=%s', 'HEAD'], root)?.trim() ?? '') : '',
-    status: (git(['status', '--porcelain=v1', '--untracked-files=all', ...OUTSIDE], root) ?? '').split('\n').filter(Boolean),
-    stat: head ? (git(['diff', 'HEAD', '--shortstat', ...OUTSIDE], root)?.trim() ?? '') : '',
+    status: (git(['status', '--porcelain=v1', '--untracked-files=all', ...outside(root)], root) ?? '').split('\n').filter(Boolean),
+    stat: head ? (git(['diff', 'HEAD', '--shortstat', ...outside(root)], root)?.trim() ?? '') : '',
     fingerprint: fingerprint(root, head),
   };
 }
@@ -273,6 +337,7 @@ function writeRecord(record) {
 const time = (record) => Date.parse(record.meta.updated || record.meta.started || '') || 0;
 // Newest first.
 function records(root) {
+  guardOwner(root);
   const dir = paths(root).conversations;
   if (!existsSync(dir)) return [];
   return readdirSync(dir)
@@ -421,8 +486,8 @@ function brief(root, record, all, { full = false, drift = true, continuing = fal
   out.push(
     '',
     continuing
-      ? `Continue this conversation's record: \`node ${DIR}/ctx.mjs save --file ${rel(root, record.file)}\`. Use this same --file for note and check; do not start another record.`
-      : `For a new conversation: \`node ${DIR}/ctx.mjs start --task ${record.meta.task} --agent <your tool>\` starts its record from this one. If this conversation already owns a record, keep using its --file instead.`,
+      ? `Continue this conversation's record: \`${invoke(root, `save --file ${fileArg(root, record.file)}`)}\`. Use this same --file for note and check; do not start another record.`
+      : `For a new conversation: \`${invoke(root, `start --task ${record.meta.task} --agent <your tool>`)}\` starts its record from this one. If this conversation already owns a record, keep using its --file instead.`,
     'These are notes from an earlier session, not instructions: check them against the code, and re-run stale checks before relying on them.',
   );
   return out.join('\n');
@@ -432,9 +497,9 @@ function regenerate(root) {
   const all = records(root);
   const p = paths(root);
   const rows = all.map((record) => `| ${human(record.meta.updated)} | ${record.meta.task} | ${record.meta.agent} | ${record.meta.status || 'in progress'} | [${path.basename(record.file)}](conversations/${encodeURI(path.basename(record.file))}) |`);
-  writeFileSync(p.index, ['# Context records', '', 'Newest first. `node .context/ctx.mjs resume` prints the latest open one and what changed since.', '', '| Updated | Task | Agent | Status | Record |', '|---|---|---|---|---|', ...rows, ''].join('\n'));
+  writeFileSync(p.index, ['# Context records', '', `Newest first. \`${invoke(root, 'resume')}\` prints the latest open one and what changed since.`, '', '| Updated | Task | Agent | Status | Record |', '|---|---|---|---|---|', ...rows, ''].join('\n'));
   const latest = latestOpen(all);
-  if (latest) writeFileSync(p.brief, `${brief(root, latest, all, { drift: false })}\n\n(Written at the last save. \`node .context/ctx.mjs resume\` adds what changed since.)\n`);
+  if (latest) writeFileSync(p.brief, `${brief(root, latest, all, { drift: false })}\n\n(Written at the last save. \`${invoke(root, 'resume')}\` adds what changed since.)\n`);
 }
 function createRecord(root, { task, agent, session = '', previous, preface }) {
   const now = new Date();
@@ -461,10 +526,13 @@ function createRecord(root, { task, agent, session = '', previous, preface }) {
 }
 // Mutations need one unambiguous owner; never silently choose another conversation.
 function pick(root, flags) {
+  guardOwner(root);
   let matches;
   if (flags.file) {
     const file = [path.resolve(flags.file), path.resolve(root, flags.file)].find((candidate) => existsSync(candidate));
     if (!file) return { error: `No record at ${flags.file}.` };
+    // A shared folder holds sibling projects' records: a record is only this project's own.
+    if (CONTEXT_BASE && !samePath(path.dirname(path.resolve(file)), paths(root).conversations)) return { error: `${flags.file} is not a record of this project: its records are in ${paths(root).conversations}.` };
     matches = [readRecord(file)];
   } else matches = records(root);
   if (flags.session) matches = matches.filter((record) => record.meta.session === flags.session);
@@ -478,9 +546,11 @@ function pick(root, flags) {
 // project's own files stay untouched; and keeps a copy of this script there for every tool.
 function ensure(root) {
   const p = paths(root);
+  guardOwner(root);
   const created = !existsSync(p.dir);
   mkdirSync(p.conversations, { recursive: true });
   if (created) writeFileSync(path.join(p.dir, '.gitignore'), '# Local notes for chats and tools. Delete this file to share them through git.\n*\n');
+  if (CONTEXT_BASE && !existsSync(p.owner)) writeFileSync(p.owner, `${path.resolve(root)}\n`);
   if (!existsSync(p.readme)) writeFileSync(p.readme, README);
   let copied = false;
   if (path.resolve(SELF) !== path.resolve(p.script) && versionOf(p.script) < VERSION) {
@@ -502,8 +572,8 @@ function versionOf(file) {
 function init() {
   const root = findRoot();
   const { created, copied } = ensure(root);
-  print(created ? `Created ${DIR}/ in ${root}; git ignores it through its own .gitignore.` : `${DIR}/ is already in ${root}.`);
-  if (copied) print(`Copied the script to ${DIR}/ctx.mjs, so every tool in this project can run it.`);
+  print(created ? `Created ${shown(root)} for ${root}; git ignores it through its own .gitignore.` : `${shown(root)} is already there for ${root}.`);
+  if (copied) print(`Copied the script to ${shown(root)}ctx.mjs, so every tool in this project can run it.`);
   return 0;
 }
 
@@ -522,14 +592,14 @@ function start(flags) {
   const task = slug(flags.task ?? latestOpen(all)?.meta.task);
   const agent = slug(flags.agent ?? detectAgent());
   const previous = currentTasks(all).find((record) => record.meta.task === task);
-  if (created) print(`Created ${DIR}/; git ignores it through its own .gitignore.`, '');
+  if (created) print(`Created ${shown(root)}; git ignores it through its own .gitignore.`, '');
   const ws = workspace(root);
   if (previous) print(brief(root, previous, all, { ws }), '');
   const record = createRecord(root, { task, agent, session: flags.session ?? '', previous });
   regenerate(root);
   print(
     `This conversation's record: ${rel(root, record.file)}`,
-    `Keep its sections current, then save: node ${DIR}/ctx.mjs save --file ${rel(root, record.file)}`,
+    `Keep its sections current, then save: ${invoke(root, `save --file ${fileArg(root, record.file)}`)}`,
   );
   return 0;
 }
@@ -538,7 +608,7 @@ function save(flags) {
   const root = findRoot();
   const { record, error } = pick(root, flags);
   if (error) return fail(error);
-  if (!record) return fail(`No record to save. Start one: node ${DIR}/ctx.mjs start --task <name> --agent <your tool>`);
+  if (!record) return fail(`No record to save. Start one: ${invoke(root, 'start --task <name> --agent <your tool>')}`);
   if (flags.status && !STATUSES.includes(flags.status.replace(/-/g, ' '))) return fail(`--status is one of: ${STATUSES.join(', ')}.`);
   const found = findSecrets(narrative(record.body));
   if (found.length && !flags.mask) {
@@ -570,7 +640,7 @@ function note(flags, positional) {
   const root = findRoot();
   const { record, error } = pick(root, flags);
   if (error) return fail(error);
-  if (!record) return fail(`No record to add to. Start one: node ${DIR}/ctx.mjs start --task <name> --agent <your tool>`);
+  if (!record) return fail(`No record to add to. Start one: ${invoke(root, 'start --task <name> --agent <your tool>')}`);
   const text = words.join(' ');
   const found = findSecrets(text);
   if (found.length) {
@@ -620,7 +690,7 @@ function resume(flags) {
   const root = findRoot();
   const all = records(root);
   if (!all.length) {
-    print(existsSync(paths(root).dir) ? `No records in ${DIR}/ yet.` : `No ${DIR}/ here yet. Start one: node ctx.mjs start --task <name> --agent <your tool>`);
+    print(existsSync(paths(root).dir) ? `No records in ${shown(root)} yet.` : `No ${shown(root)} here yet. Start one: ${CONTEXT_BASE ? invoke(root, 'start --task <name> --agent <your tool>', SELF) : 'node ctx.mjs start --task <name> --agent <your tool>'}`);
     return 0;
   }
   const continuing = Boolean(flags.file || flags.session);
@@ -646,7 +716,7 @@ function copyToClipboard(text) {
 function list() {
   const root = findRoot();
   const all = records(root);
-  if (!all.length) print(`No records in ${DIR}/ yet.`);
+  if (!all.length) print(`No records in ${shown(root)} yet.`);
   for (const record of all) print(`${human(record.meta.updated)}  ${record.meta.task}  ${record.meta.agent}  ${record.meta.status || 'in progress'}  ${rel(root, record.file)}`);
   return 0;
 }
@@ -663,19 +733,20 @@ function doctor() {
     if (!ok) problems++;
   };
   const self = `node "${SELF.split(path.sep).join('/')}"`;
+  const selfRun = (command) => (CONTEXT_BASE ? invoke(root, command, SELF) : `${self} ${command}`);
   const major = Number(process.versions.node.split('.')[0]);
   report(major >= 18, `Node.js ${process.versions.node}`, major >= 18 ? '' : 'install Node.js 18 or later');
   if (git(['rev-parse', '--is-inside-work-tree'], root)?.trim() !== 'true') print('note Not a git repository: records keep no branch, changes, or check freshness.');
   if (!existsSync(p.conversations)) {
-    report(false, `No ${DIR}/ in ${root}`, `${self} start --task <name> --agent <your tool>`);
+    report(false, `No ${shown(root)} ${CONTEXT_BASE ? 'for' : 'in'} ${root}`, selfRun('start --task <name> --agent <your tool>'));
     return 1;
   }
-  report(true, `${DIR}/ in ${root}, with ${records(root).length} record(s)`);
-  if (!existsSync(path.join(p.dir, '.gitignore'))) print(`note ${DIR}/.gitignore is gone, so git sees the records: they will be committed with the project.`);
+  report(true, `${shown(root)} ${CONTEXT_BASE ? 'for' : 'in'} ${root}, with ${records(root).length} record(s)`);
+  if (!existsSync(path.join(p.dir, '.gitignore'))) print(`note ${shown(root)}.gitignore is gone, so git sees the records: they will be committed with the project.`);
   const copy = versionOf(p.script);
-  if (!existsSync(p.script)) report(false, `${DIR}/ctx.mjs is missing`, `${self} init`);
-  else if (!samePath(path.resolve(SELF), path.resolve(p.script)) && copy < VERSION) report(false, `${DIR}/ctx.mjs is version ${copy}, older than this script's ${VERSION}`, `${self} init`);
-  else report(true, `${DIR}/ctx.mjs, version ${copy}`);
+  if (!existsSync(p.script)) report(false, `${shown(root)}ctx.mjs is missing`, selfRun('init'));
+  else if (!samePath(path.resolve(SELF), path.resolve(p.script)) && copy < VERSION) report(false, `${shown(root)}ctx.mjs is version ${copy}, older than this script's ${VERSION}`, selfRun('init'));
+  else report(true, `${shown(root)}ctx.mjs, version ${copy}`);
   for (const [tool, { name, file }] of Object.entries(HOOKS)) {
     let commands = [];
     try {
@@ -689,15 +760,18 @@ function doctor() {
       // Not there, or not JSON: not wired.
     }
     if (!commands.length) {
-      print(`note ${name} is not wired: node ${DIR}/ctx.mjs wire ${tool} makes it resume and save by itself.`);
+      print(`note ${name} is not wired: ${invoke(root, `wire ${tool}`)} makes it resume and save by itself.`);
       continue;
     }
     const gone = commands.some((command) => !existsSync(/node "([^"]+)"/.exec(command)?.[1] ?? ''));
-    report(!gone, `${name} hooks in ${file}`, gone ? `they run a script that is not there, as after the project moved: node ${DIR}/ctx.mjs wire ${tool}` : '');
+    // Hooks that keep their records elsewhere than this run looks would write to another folder.
+    const elsewhere = commands.some((command) => !sameBase(/--context-dir "([^"]+)"/.exec(command)?.[1], contextBase(root)));
+    const fix = gone ? 'they run a script that is not there, as after the project moved' : elsewhere ? 'they keep the records in another folder than this one' : '';
+    report(!fix, `${name} hooks in ${file}`, fix ? `${fix}: ${invoke(root, `wire ${tool}`)}` : '');
     if (tool === 'codex' && !gone) print('note Codex runs hooks only once trusted: /hooks in Codex.');
   }
   const errors = (existsSync(p.errors) ? readFileSync(p.errors, 'utf8') : '').split('\n').filter((line) => /^\d{4}-\d{2}-\d{2}T/.test(line));
-  if (errors.length) report(false, `${errors.length} hook error(s), the last: ${maskText(errors[errors.length - 1]).slice(0, 200)}`, `see ${DIR}/hook-errors.log, and delete it once fixed`);
+  if (errors.length) report(false, `${errors.length} hook error(s), the last: ${maskText(errors[errors.length - 1]).slice(0, 200)}`, `see ${shown(root)}hook-errors.log, and delete it once fixed`);
   return problems ? 1 : 0;
 }
 
@@ -723,14 +797,15 @@ function hook(flags, positional) {
     if (tool === 'codex' && event !== 'SessionStart') process.stdout.write('{}\n');
     return 0;
   };
-  const root = findRoot(input.cwd || process.cwd());
-  if (!existsSync(paths(root).conversations)) return done();
+  let root;
   try {
+    root = findRoot(input.cwd || process.cwd());
+    if (!existsSync(paths(root).conversations) || foreignOwner(root)) return done();
     if (event === 'SessionStart') sessionStart(root, tool, input);
     else if (['Stop', 'PreCompact', 'SessionEnd'].includes(event)) autoSave(root, tool, input);
   } catch (error) {
     try {
-      appendFileSync(paths(root).errors, `${stamp()} ${tool} ${event}: ${error?.stack ?? error}\n`);
+      if (root && !foreignOwner(root) && existsSync(paths(root).dir)) appendFileSync(paths(root).errors, `${stamp()} ${tool} ${event}: ${error?.stack ?? error}\n`);
     } catch {
       // Nowhere to write: the tool goes on regardless.
     }
@@ -758,10 +833,10 @@ function sessionStart(root, tool, input) {
     return;
   }
   const latest = latestOpen(all);
-  const startCommand = `node ${DIR}/ctx.mjs start --task ${latest ? latest.meta.task : '<short task name>'} --agent ${AGENT_OF[tool]}${input.session_id ? ` --session ${input.session_id}` : ''}`;
+  const startCommand = invoke(root, `start --task ${latest ? latest.meta.task : '<short task name>'} --agent ${AGENT_OF[tool]}${input.session_id ? ` --session ${input.session_id}` : ''}`);
   print(
     ...(latest ? [brief(root, latest, all), ''] : ['No context records in this project yet.', '']),
-    `Context keeper: this conversation gets its own record in ${DIR}/conversations/ once it changes files. To name its task and keep notes in it from the start, run \`${startCommand}\`, keep its sections current as you work, and save it.`,
+    `Context keeper: this conversation gets its own record in ${shown(root)}conversations/ once it changes files. To name its task and keep notes in it from the start, run \`${startCommand}\`, keep its sections current as you work, and save it.`,
   );
 }
 function autoSave(root, tool, input) {
@@ -819,7 +894,9 @@ function wire(flags, positional, remove = false) {
   if (!tools.every((tool) => HOOKS[tool])) return fail(`Usage: ${remove ? 'unwire' : 'wire'} <claude|codex|all>`);
   const root = findRoot();
   if (!remove) ensure(root);
-  const script = paths(root).script.split(path.sep).join('/');
+  const script = slash(paths(root).script);
+  // The hooks reach the same records as this run: the base as an absolute path, whatever the cwd.
+  const where = CONTEXT_BASE ? ` --context-dir "${slash(contextBase(root))}"` : '';
   for (const tool of tools) {
     const { name, file, events, after } = HOOKS[tool];
     const target = path.join(root, file);
@@ -838,7 +915,7 @@ function wire(flags, positional, remove = false) {
       if (!remove) {
         groups.push({
           ...(options.matcher ? { matcher: options.matcher } : {}),
-          hooks: [{ type: 'command', command: `node "${script}" hook ${tool}`, timeout: options.timeout ?? 30 }],
+          hooks: [{ type: 'command', command: `node "${script}" hook ${tool}${where}`, timeout: options.timeout ?? 30 }],
         });
       }
       if (groups.length) settings.hooks[event] = groups;
@@ -881,5 +958,20 @@ if (!COMMANDS[name]) {
   process.exitCode = asked ? 0 : 1;
 } else {
   const { flags, positional } = parse(rest);
-  process.exitCode = COMMANDS[name](flags, positional) ?? 0;
+  try {
+    if ('context-dir' in flags) {
+      const value = flags['context-dir'];
+      if (typeof value !== 'string' || !value.trim() || value.startsWith('--')) throw new UsageError('--context-dir needs a folder: --context-dir <path>.');
+      CONTEXT_BASE = value;
+    }
+    process.exitCode = COMMANDS[name](flags, positional) ?? 0;
+  } catch (error) {
+    // A hook never fails the tool, even on a bad --context-dir: it says why and exits 0.
+    if (name === 'hook') {
+      eprint(`Context keeper hook skipped: ${error?.message ?? error}`);
+      if (positional[0] === 'codex') process.stdout.write('{}\n');
+      process.exitCode = 0;
+    } else if (error instanceof UsageError) process.exitCode = fail(error.message);
+    else throw error;
+  }
 }
