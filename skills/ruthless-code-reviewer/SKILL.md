@@ -114,6 +114,14 @@ End with **Verdict:** and one of `APPROVE`, `APPROVE WITH MINOR ISSUES`, `CHANGE
 `BLOCK`, or `INCONCLUSIVE`, following the rubric above. Briefly state the exact target reviewed,
 checks actually performed, and material coverage or test gaps. Omit empty boilerplate sections.
 
+## Plain-language pass (automatic)
+
+After the findings, verdict, and checks above are final, apply the `humanizer` skill to the
+written review before showing it to the user, when the skill is installed. This is the default; skip
+it only when the user asks for terse or raw output. The pass changes wording only: priorities,
+order, **Verification status** labels, locations, and the verdict stay identical, and the review
+itself is not redone. If `humanizer` is not installed, present the review as written.
+
 When unclear intent materially changes whether behavior is a defect, ask a concise question
 instead of guessing. Keep independent review work moving; questions are not findings and do not
 by themselves change the verdict.
